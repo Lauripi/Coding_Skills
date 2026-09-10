@@ -1,0 +1,123 @@
+DROP DATABASE if exists Laboratory;
+CREATE DATABASE Laboratory;
+USE Laboratory;
+
+CREATE TABLE Employees (
+	EmployeeID int PRIMARY KEY AUTO_INCREMENT,
+    FirstName varchar(255) NOT NULL,
+    LastName varchar(255) NOT NULL,
+    Mail varchar(255) UNIQUE,
+    Room int,
+    Job varchar(255),
+    Salary int,
+    CONSTRAINT MailCheck CHECK (Mail LIKE '%_@_%._%'),
+    CONSTRAINT SalaryCheck CHECK (Salary > 0)
+);
+
+CREATE TABLE Tools (
+	ToolID int PRIMARY KEY AUTO_INCREMENT,
+    ToolName varchar(255) NOT NULL,
+    Manufacturer varchar(255),
+    Price_in_Euro float
+);
+
+CREATE TABLE Experiments (
+	ExperimentID int PRIMARY KEY AUTO_INCREMENT,
+    ExperimentName varchar(255) NOT NULL,
+    ExperimentTime int,
+    ExperimentType varchar(255),
+    CONSTRAINT TimeCheck CHECK (ExperimentTime > 0),
+    CONSTRAINT TypeCheck CHECK (ExperimentType in ('Sequencing','Concentration Measurement'))
+);
+
+CREATE TABLE Results (
+	ResultID int PRIMARY KEY AUTO_INCREMENT,
+    ResultName varchar(255),
+    Description varchar(1000)
+);
+
+CREATE TABLE Experiment_Result (
+	ExperimentID int,
+    ResultID int,
+    Remark varchar(500),
+    PRIMARY KEY (ExperimentID,ResultID),
+    FOREIGN KEY (ExperimentID) REFERENCES Experiments(ExperimentID),
+    FOREIGN KEY (ResultID) REFERENCES Results(ResultID)
+);
+
+CREATE TABLE Experiment_Employee (
+	ExperimentID int,
+    EmployeeID int,
+    Weekday varchar(9) NOT NULL,
+    Repeats int NOT NULL DEFAULT 1,
+    WorkTime int,
+    PRIMARY KEY (ExperimentID,EmployeeID),
+    FOREIGN KEY (ExperimentID) REFERENCES Experiments(ExperimentID),
+    FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID),
+    CONSTRAINT WorkTimeCheck CHECK (WorkTime > 0),
+    CONSTRAINT DayCheck CHECK (Weekday in ('Monday','Tuesday','Wednesday','Thursday','Friday'))
+);
+
+CREATE TABLE Experiment_Tool (
+	ExperimentID int,
+    ToolID int,
+    Quantity int DEFAULT 1,
+    PRIMARY KEY (ExperimentID, ToolID),
+    FOREIGN KEY (ExperimentID) REFERENCES Experiments(ExperimentID),
+    FOREIGN KEY (ToolID) REFERENCES Tools(ToolID)
+);
+
+DROP DATABASE if exists Greenhouses;
+CREATE DATABASE Greenhouses;
+USE Greenhouses;
+
+CREATE TABLE Greenhouses (
+	GreenhouseID int PRIMARY KEY AUTO_INCREMENT,
+    Size int NOT NULL,
+    Address varchar(255) UNIQUE,
+    NumberPatches int,
+    Temp_in_Celsius float,
+    Humidity_in_Percent float,
+    CONSTRAINT PatchCheck CHECK (NumberPatches > 0),
+    CONSTRAINT TempCheck CHECK (20 < Temp_in_Celsius < 50),
+    CONSTRAINT HumidityCheck CHECK (0 <= Humidity_in_Percent <= 100)
+);
+
+CREATE TABLE Gardeners (
+	GardenerID int PRIMARY KEY AUTO_INCREMENT,
+    First_Name varchar(255) NOT NULL,
+    Last_Name varchar(255) NOT NULL,
+    Address varchar(255),
+    Telephone varchar(20),
+    Salary int,
+    CONSTRAINT SalaryCheck CHECK (Salary > 0)
+);
+
+CREATE TABLE Plants (
+	PlantID int PRIMARY KEY AUTO_INCREMENT,
+    PlantName varchar(255) UNIQUE,
+    TaxonomicName varchar(255),
+    PlantType varchar(10),
+    Mutation varchar(10),
+    CONSTRAINT TypeCheck CHECK (PlantType in ('mutated','wildtype'))
+);
+
+CREATE TABLE Gardener_Greenhouse (
+	GardenerID int,
+    GreenhouseID int,
+    Time_in_hours float,
+    PRIMARY KEY (GardenerID,GreenhouseID,Time_in_hours),
+    FOREIGN KEY (GardenerID) REFERENCES Gardeners(GardenerID),
+    FOREIGN KEY (GreenhouseID) REFERENCES Greenhouses(GreenhouseID),
+    CONSTRAINT WorkCheck CHECK (Time_in_hours > 0)
+);
+
+CREATE TABLE Plant_Greenhouse (
+	PlantID int,
+    GreenhouseID int,
+    Quantity int DEFAULT 20,
+    Patch int,
+    PRIMARY KEY (PlantID,GreenhouseID,Patch),
+    FOREIGN KEY (PlantID) REFERENCES Plants(PlantID),
+    FOREIGN KEY (GreenhouseID) REFERENCES Greenhouses(GreenhouseID)
+);

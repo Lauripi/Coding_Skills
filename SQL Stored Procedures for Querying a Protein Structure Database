@@ -1,0 +1,46 @@
+DELIMITER //
+CREATE PROCEDURE SelectAllOrganisms () 
+BEGIN 
+	SELECT * FROM Organisms;
+END //
+
+CREATE PROCEDURE SelectAllAlphaFold () 
+BEGIN 
+	SELECT * FROM Structures WHERE Source_ID=2;
+END //
+
+CREATE PROCEDURE SelectAllStrucData () 
+BEGIN 
+	SELECT Identifier,Resolution,Released 
+    FROM Structural_data;
+END //
+
+CREATE PROCEDURE SelectAllSecondary () 
+BEGIN 
+	SELECT * FROM Secondary_Structure 
+    WHERE Structure_Name='Helix';
+END //
+
+CREATE PROCEDURE SelectAllLongProts () 
+BEGIN 
+	SELECT Protein_Name,Protein_Length FROM Proteins
+    WHERE Protein_Length>250;
+END //
+
+-- Optional
+CREATE PROCEDURE SelectAllOrganismsKingdoms () 
+BEGIN 
+	SELECT * FROM kingdoms 
+	WHERE Kingdom_ID IN (SELECT Kingdom_ID FROM organisms);
+END //
+
+CREATE PROCEDURE SelectAllProtWithStruc () 
+BEGIN 
+	SELECT * FROM proteins 
+	WHERE Protein_ID IN 
+	(SELECT Protein_ID FROM structures 
+    WHERE Source_ID=1);
+END //
+DELIMITER ;
+
+CALL selectallstrucdata();

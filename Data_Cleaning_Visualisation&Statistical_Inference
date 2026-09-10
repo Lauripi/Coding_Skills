@@ -1,0 +1,298 @@
+---
+title: "Palmer Penguins — Data Cleaning, Visualisation & Statistical Inference"
+author: "Lauriane Pous"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    theme: cosmo
+    embed-resources: true
+    fig-width: 7
+    fig-height: 4.5
+execute:
+  warning: false
+  message: false
+editor: visual
+---
+
+## Goal of this script
+
+The Palmer Penguins dataset records body measurements for three penguin species (*Adelie*, *Chinstrap*, *Gentoo*) collected on three islands of the Palmer Archipelago. I use it here as a compact end-to-end demonstration of how I approach a fresh dataset:
+
+1.  inspect and **clean** the data (types, missing values, plausibility),
+2.  **describe** it with the right summaries for each variable type,
+3.  **visualise** the structure to generate hypotheses,
+4.  test those hypotheses with appropriate **inferential statistics**.
+
+The aim is not to discover anything new about penguins, but to show a clean and reproducible workflow.
+
+## Setup
+
+Everything loads from packages, so the script is fully reproducible — no local files involved.
+
+```{r}
+
+# one call installs (if missing) and loads everything — reproducible on any machine
+pacman::p_load(
+  conflicted,
+  tidyverse,        # dplyr, tidyr, ggplot2, purrr, stringr
+  palmerpenguins,   # the dataset
+  wrappedtools,     # ksnormal(), meansd(), median_quart(), formatP(), ColSeeker()
+  flextable,        # publication-ready tables
+  patchwork,        # compose ggplots
+  ggbeeswarm        # jittered points without overlap
+)
+
+# settle the usual namespace clashes once, explicitly
+conflicts_prefer(dplyr::filter, dplyr::select, dplyr::lag, .quiet = TRUE)
+
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. First look & cleaning
+
+```{r}
+#| label: import
+raw <- palmerpenguins::penguins
+glimpse(raw)
+```
+
+Eight columns: three factors (`species`, `island`, `sex`), one integer that is really a grouping variable (`year`) and four continuous measurements. Before touching anything I want to know **where the holes are**.
+
+```{r}
+#| label: missingness
+raw |>
+  summarise(across(everything(), ~ sum(is.na(.x)))) |>
+  pivot_longer(everything(), names_to = "Variable", values_to = "n_missing") |>
+  arrange(desc(n_missing)) |>
+  flextable() |>
+  theme_booktabs() |>
+  autofit() |>
+  set_caption("Missing values per variable")
+```
+
+Two patterns: 2 penguins have **no body measurements at all** (every numeric column missing — these rows carry no information for an analysis of size), and `sex` is missing for 11 birds. My decisions:
+
+- drop the 2 rows with no measurements (they cannot contribute to any numeric analysis),
+- **keep** the birds with unknown sex — they still have valid measurements, so I only exclude them from sex-specific tests rather than throwing the whole row away.
+
+I also recode `year` as a factor (it is a label, not a quantity) and add two derived variables I find useful: the bill aspect ratio and body mass in kg.
+
+```{r}
+#| label: clean
+penguins <- raw |>
+  mutate(
+    year         = factor(year, levels = 2007:2009),
+    bill_ratio   = bill_length_mm / bill_depth_mm,
+    body_mass_kg = body_mass_g / 1000
+  ) |>
+  # remove only the rows that have no measurements at all
+  drop_na(bill_length_mm, bill_depth_mm, flipper_length_mm, body_mass_g)
+
+nrow(penguins)            # 342 birds kept
+sum(is.na(penguins$sex))  # 9 still have unknown sex — kept on purpose
+```
+
+Last cleaning step: a quick plausibility check on the numeric ranges. Bad units or data-entry typos usually show up here as impossible values.
+
+```{r}
+#| label: ranges
+numvars <- ColSeeker(penguins, varclass = "numeric")
+for (v in numvars$names) {
+  cat(str_pad(v, 18), ":", range(penguins[[v]], na.rm = TRUE), "\n")
+}
+```
+
+All ranges are biologically sensible (bills 32–60 mm, flippers 172–231 mm, mass 2.7–6.3 kg), so no further correction is needed. The data is now tidy.
+
+## 2. Descriptive statistics
+
+**Categorical variables** are described with counts and percentages.
+
+```{r}
+#| label: desc-cat
+factvars <- ColSeeker(penguins, namepattern = c("species", "island", "sex", "year"))
+
+penguins |>
+  mutate(sex = fct_na_value_to_level(sex, "(unknown)")) |>
+  cat_desc_table(desc_vars = factvars$names) |>
+  rename(`n (%)` = desc_all) |>
+  flextable() |>
+  theme_booktabs() |>
+  autofit() |>
+  bg(~ `n (%)` == " ", bg = "grey92") |>
+  set_caption("Composition of the sample")
+```
+
+**Continuous variables** are summarised both as mean ± SD and as median \[quartiles\], split by species — because, as the plots below confirm, the species are very different animals and a pooled mean would be misleading.
+
+```{r}
+#| label: desc-cont
+cont_vars <- c("bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g")
+
+penguins |>
+  group_by(species) |>
+  summarise(across(all_of(cont_vars),
+                   list(MeanSD      = ~ meansd(.x, add_n = TRUE),
+                        MedianQuart = ~ median_quart(.x)),
+                   .names = "{.col}_{.fn}"),
+            .groups = "drop") |>
+  pivot_longer(-species,
+               names_to = c("Variable", ".value"),
+               names_pattern = "^(.*)_(MeanSD|MedianQuart)$") |>
+  pivot_wider(names_from = species, values_from = c(MeanSD, MedianQuart)) |>
+  flextable() |>
+  theme_booktabs() |>
+  merge_v(j = 1) |>
+  autofit() |>
+  set_caption("Body measurements by species (Mean ± SD and Median [Q1, Q3])")
+```
+
+## 3. Visualisation
+
+### Distributions by species
+
+```{r}
+#| label: fig-density
+#| fig-height: 6
+dens_plots <- map(cont_vars, function(v) {
+  ggplot(penguins, aes(x = .data[[v]], fill = species)) +
+    geom_density(alpha = 0.4, colour = NA) +
+    labs(x = v, y = NULL)
+})
+# guides = "collect" merges the four identical legends into one
+wrap_plots(dens_plots, ncol = 2, guides = "collect") +
+  plot_annotation(title = "Distribution by species shows different species phenotypes") &
+  theme(legend.position = "right")
+```
+
+Flipper length and body mass clearly separate *Gentoo* from the other two; bill *depth* separates *Gentoo* (shallow bills) while bill *length* separates *Adelie* (short bills). No single measurement separates all three — which is exactly what makes the next plot interesting.
+
+### Bill shape & a textbook Simpson's paradox
+
+```{r}
+#| label: fig-simpson
+p_pooled <- ggplot(penguins, aes(bill_length_mm, bill_depth_mm)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  labs(title = "Ignoring species:\nlength ↑  depth ↓ (negative)",
+       x = "Bill length (mm)", y = "Bill depth (mm)")
+
+p_bysp <- ggplot(penguins, aes(bill_length_mm, bill_depth_mm, colour = species)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Within each species:\nlength ↑  depth ↑ (positive)",
+       x = "Bill length (mm)", y = "Bill depth (mm)") +
+  theme(legend.position = "bottom")
+
+p_pooled + p_bysp
+```
+
+Pooled across species the two bill dimensions look *negatively* correlated, but **within** every species the relationship is *positive*. This sign reversal is a classic Simpson's paradox : it's a good reminder to always check whether a confounder (here, species) is driving an association.
+
+### Flipper length vs body mass
+
+```{r}
+#| label: fig-scatter
+ggplot(penguins, aes(flipper_length_mm, body_mass_g, colour = species)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_colour_brewer(palette = "Dark2") +
+  labs(title = "Heavier penguins have longer flippers",
+       x = "Flipper length (mm)", y = "Body mass (g)", colour = "Species")
+```
+
+### Body mass by species
+
+```{r}
+#| label: fig-mass
+ggplot(penguins, aes(species, body_mass_g, fill = species)) +
+  geom_violin(alpha = 0.35, colour = NA) +
+  geom_beeswarm(alpha = 0.45, size = 0.8) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(x = NULL, y = "Body mass (g)") +
+  theme(legend.position = "none")
+```
+
+## 4. Inferential statistics
+
+### 4.1 Are continuous variables normally distributed across species?
+
+The choice between a parametric and a non-parametric test depends on the distribution **within each group**, so I test normality per species with a Shapiro test.
+
+```{r}
+#| label: normality
+penguins |>
+  group_by(species) |>
+  summarise(across(all_of(cont_vars), ~ shapiro.test(na.omit(.x))$p.value), .groups = "drop") |>
+  mutate(across(-species, ~ formatP(.x, mark = TRUE))) |>
+  flextable() |>
+  theme_booktabs() |>
+  autofit() |>
+  set_caption("Shapiro p-values for normality (per species)") |>
+  add_footer_lines("p > 0.05 is compatible with a normal distribution.")
+```
+
+We have mixed species distributions per variables
+
+### 4.2 Do continuous variables differ between species? 
+
+```{r}
+#| label: anova
+# parametric vs non-parametric for every variable, side by side
+tibble(Variable = cont_vars) |>
+  mutate(
+    p_ANOVA   = map_dbl(Variable,
+                        ~ summary(aov(reformulate("species", .x), data = penguins))[[1]][["Pr(>F)"]][1]),
+    p_Kruskal = map_dbl(Variable,
+                        ~ kruskal.test(reformulate("species", .x), data = penguins)$p.value),
+    Agreement = if_else((p_ANOVA < .05) == (p_Kruskal < .05), "consistent", "DIFFERENT")
+  ) |>
+  mutate(across(starts_with("p_"), ~ formatP(.x, mark = TRUE))) |>
+  flextable() |>
+  theme_booktabs() |>
+  autofit() |>
+  set_caption("Species differences: parametric (ANOVA) vs non-parametric (Kruskal–Wallis)") |>
+  add_footer_lines("Both tests reported for every variable, so the conclusion does not rely on the normality assumption.")
+```
+
+parametric and non parametric tests showed consistent difference between continuous variables and species
+
+### 4.3 Sexual dimorphism in body mass (two-sample t-test)
+
+Comparing the sexes on the *pooled* data would confound sex with species, so I test **within a single species** (*Gentoo*).
+
+```{r}
+#| label: ttest
+# Assuming normal distribution 
+gentoo <- penguins |> filter(species == "Gentoo", !is.na(sex))
+t.test(body_mass_g ~ sex, data = gentoo)
+```
+
+Male Gentoo penguins are on average \~800 g heavier than females, clear sexual dimorphism.
+
+### 4.4 Is sex distributed equally across species? (chi-square)
+
+A categorical-vs-categorical association test. Here I expect **no** association
+
+```{r}
+#| label: chisq
+tab <- table(penguins$species, penguins$sex)
+tab
+chisq.test(tab)
+```
+
+No significant association between species and sex
+
+### 4.5 Flipper length vs body mass (correlation)
+
+```{r}
+#| label: correlation
+cor.test(penguins$flipper_length_mm, penguins$body_mass_g, method = "pearson") # pearson : assuming linear correlation (data are approximately normal)
+```
+
+A strong positive linear relationship (*r* ≈ 0.87, 95% CI 0.84–0.89), matching the scatter plot above.
+
+## 
