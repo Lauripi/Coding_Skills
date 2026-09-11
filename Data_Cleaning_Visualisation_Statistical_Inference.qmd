@@ -79,6 +79,17 @@ raw |>
 ```
 
 Two patterns: `sex` is missing for 11 birds, and each of the four measurements is missing for exactly 2 birds. Are those the *same* 2 birds? Rather than trusting my eyes, I check it:
+<<<<<<< HEAD
+
+```{r}
+#| label: empty-rows
+# rows where every measurement is NA
+raw |> filter(if_all(all_of(cont_vars), is.na))
+```
+
+Yes — 2 penguins have **no body measurements at all**; these rows carry no information for an analysis of size. My decisions:
+=======
+>>>>>>> 03f663fa91c592832186499f4bb09e756694c560
 
 ```{r}
 #| label: empty-rows
@@ -88,8 +99,8 @@ raw |> filter(if_all(all_of(cont_vars), is.na))
 
 Yes — 2 penguins have **no body measurements at all**; these rows carry no information for an analysis of size. My decisions:
 
-- drop the 2 rows with no measurements (they cannot contribute to any numeric analysis),
-- **keep** the birds with unknown sex — they still have valid measurements, so I only exclude them from sex-specific tests rather than throwing the whole row away.
+-   drop the 2 rows with no measurements (they cannot contribute to any numeric analysis),
+-   **keep** the birds with unknown sex — they still have valid measurements, so I only exclude them from sex-specific tests rather than throwing the whole row away.
 
 I also recode `year` as a factor (it is a label, not a quantity) and add two derived variables I find useful: the bill aspect ratio and body mass in kg.
 
@@ -313,6 +324,12 @@ A strong positive linear relationship (*r* ≈ 0.87, 95% CI 0.84–0.89), matchi
 
 ## Summary
 
+<<<<<<< HEAD
 - **Cleaning:** 2 of 344 rows had no measurements and were dropped; 9 birds of unknown sex were kept and excluded only from sex-specific tests. All numeric ranges are biologically plausible.
 - **Structure:** the three species have distinct phenotypes, and species confounds the bill length–depth relationship (Simpson's paradox).
 - **Inference:** every measurement differs between species (parametric and non-parametric tests agree); Gentoo males are \~800 g heavier than females; sex is balanced across species; flipper length and body mass are strongly correlated (*r* ≈ 0.87).
+=======
+-   **Cleaning:** 2 of 344 rows had no measurements and were dropped; 9 birds of unknown sex were kept and excluded only from sex-specific tests. All numeric ranges are biologically plausible.
+-   **Structure:** the three species have distinct phenotypes, and species confounds the bill length–depth relationship (Simpson's paradox).
+-   **Inference:** every measurement differs between species (parametric and non-parametric tests agree); Gentoo males are \~800 g heavier than females; sex is balanced across species; flipper length and body mass are strongly correlated (*r* ≈ 0.87).
+>>>>>>> 03f663fa91c592832186499f4bb09e756694c560
