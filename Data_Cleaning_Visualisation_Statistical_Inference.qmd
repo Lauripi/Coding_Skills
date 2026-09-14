@@ -1,14 +1,10 @@
 ---
 title: "Palmer Penguins — Data Cleaning, Visualisation & Statistical Inference"
 author: "Lauriane Pous"
-date: today
 format:
-  html:
+  gfm:
     toc: true
     toc-depth: 3
-    code-fold: show
-    theme: cosmo
-    embed-resources: true
     fig-width: 7
     fig-height: 4.5
 execute:

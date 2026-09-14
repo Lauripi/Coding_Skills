@@ -47,9 +47,6 @@ clean and reproducible workflow.
 Everything loads from packages, so the script is fully reproducible, no
 local files involved.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 # pacman installs (if missing) and loads everything in one call — reproducible on any machine
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
@@ -72,19 +69,12 @@ cont_vars <- c("bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mas
 cat_vars  <- c("species", "island", "sex", "year")
 ```
 
-</details>
-
 ## 1. First look & cleaning
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 raw <- palmerpenguins::penguins
 glimpse(raw)
 ```
-
-</details>
 
     Rows: 344
     Columns: 8
@@ -102,9 +92,6 @@ that is really a grouping variable (`year`) and four continuous
 measurements. Before touching anything I want to know **where the holes
 are**.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 raw |>
   summarise(across(everything(), ~ sum(is.na(.x)))) |>
@@ -116,23 +103,16 @@ raw |>
   set_caption("Missing values per variable")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/missingness-1.png)
 
 2 patterns: `sex` is missing for 11 birds, and each of the four
 measurements is missing for exactly 2 birds. Are those the *same* 2
 birds? Rather than trusting my eyes, I check it:
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 # rows where every measurement is NA
 raw |> filter(if_all(all_of(cont_vars), is.na))
 ```
-
-</details>
 
     # A tibble: 2 × 8
       species island    bill_length_mm bill_depth_mm flipper_length_mm body_mass_g
@@ -155,9 +135,6 @@ one derived variable: the bill ratio (length ÷ depth), a unit-free
 measure of bill *shape* rather than size, which I come back to in
 section 3.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 penguins <- raw |>
   mutate(
@@ -170,26 +147,16 @@ penguins <- raw |>
 nrow(penguins)            # 342 birds kept
 ```
 
-</details>
-
     [1] 342
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 sum(is.na(penguins$sex))  # 9 still have unknown sex — kept on purpose
 ```
 
-</details>
-
     [1] 9
 
 Last cleaning step: a quick plausibility check on the numeric ranges.
 Bad units or data-entry typos usually show up here as impossible values.
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 penguins |>
@@ -204,8 +171,6 @@ penguins |>
   set_caption("Range of every numeric variable")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/ranges-1.png)
 
 All ranges are biologically sensible (bills 32–60 mm long and 13–22 mm
@@ -215,9 +180,6 @@ further correction is needed. The data is now tidy.
 ## 2. Descriptive statistics
 
 **Categorical variables** are described with counts and percentages.
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 penguins |>
@@ -233,17 +195,12 @@ penguins |>
   set_caption("Composition of the sample")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/desc-cat-1.png)
 
 **Continuous variables** are summarized both as mean ± SD and as median
 (Q1/Q3), split by species because, as the plots below confirm, the
 species are very different animals and a pooled mean would be
 misleading.
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 penguins |>
@@ -263,16 +220,11 @@ penguins |>
   set_caption("Body measurements by species")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/desc-cont-1.png)
 
 ## 3. Visualization
 
 ### Distributions by species
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 dens_plots <- map(cont_vars, function(v) {
@@ -285,8 +237,6 @@ wrap_plots(dens_plots, ncol = 2, guides = "collect") +
   plot_annotation(title = "Each species has its own phenotype") &
   theme(legend.position = "right")
 ```
-
-</details>
 
 <div id="fig-density">
 
@@ -304,9 +254,6 @@ bill *length* separates *Adelie* (short bills).
 
 ### Bill shape as an illustration of Simpson’s paradox
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 p_pooled <- ggplot(penguins, aes(bill_length_mm, bill_depth_mm)) +
   geom_point(alpha = 0.6) +
@@ -323,8 +270,6 @@ p_bysp <- ggplot(penguins, aes(bill_length_mm, bill_depth_mm, colour = species))
 
 p_pooled + p_bysp
 ```
-
-</details>
 
 <div id="fig-simpson">
 
@@ -349,9 +294,6 @@ and what sets them apart is the proportion between bill length and depth
 rather than either value alone. That is what the bill ratio from the
 cleaning step captures
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 ggplot(penguins, aes(species, bill_ratio, fill = species)) +
   geom_violin(alpha = 0.35, colour = NA) +
@@ -361,8 +303,6 @@ ggplot(penguins, aes(species, bill_ratio, fill = species)) +
        x = NULL, y = "Bill ratio (length / depth)") +
   theme(legend.position = "none")
 ```
-
-</details>
 
 <div id="fig-ratio">
 
@@ -379,9 +319,6 @@ Species differ in bill *shape* more than in bill *size*.
 
 ### Flipper length vs body mass
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 ggplot(penguins, aes(flipper_length_mm, body_mass_g, colour = species)) +
   geom_point(alpha = 0.6) +
@@ -390,8 +327,6 @@ ggplot(penguins, aes(flipper_length_mm, body_mass_g, colour = species)) +
   labs(title = "Heavier penguins have longer flippers",
        x = "Flipper length (mm)", y = "Body mass (g)", colour = "Species")
 ```
-
-</details>
 
 <div id="fig-scatter">
 
@@ -405,9 +340,6 @@ Figure 4
 
 ### Body mass by species
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 ggplot(penguins, aes(species, body_mass_g, fill = species)) +
   geom_violin(alpha = 0.35, colour = NA) +
@@ -416,8 +348,6 @@ ggplot(penguins, aes(species, body_mass_g, fill = species)) +
   labs(title = "Gentoo penguins are heavier", x = NULL, y = "Body mass (g)") +
   theme(legend.position = "none")
 ```
-
-</details>
 
 <div id="fig-mass">
 
@@ -437,9 +367,6 @@ The choice between a parametric and a non-parametric test depends on the
 distribution **within each group**, so I test normality per species with
 a Shapiro–Wilk test.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 penguins |>
   group_by(species) |>
@@ -452,8 +379,6 @@ penguins |>
   add_footer_lines("p > 0.05 is compatible with a normal distribution.")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/normality-1.png)
 
 The picture is mixed: most combinations are compatible with normality,
@@ -462,9 +387,6 @@ measurements, reject it). So I do not rely on the assumption and report
 a parametric and a non-parametric test side by side in the next section.
 
 ### 4.2 Do the measurements differ between species?
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 # one-way ANOVA (parametric) vs Kruskal–Wallis (non-parametric) for every variable
@@ -484,12 +406,7 @@ tibble(Variable = cont_vars) |>
   add_footer_lines("Both tests are reported for every variable, so the conclusion does not rely on the normality assumption.")
 ```
 
-</details>
-
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/anova-1.png)
-
-<details open class="code-fold">
-<summary>Code</summary>
 
 ``` r
 # which pairs of species differ, and by how much? Tukey HSD controls the error rate across the 3 comparisons
@@ -507,8 +424,6 @@ map(cont_vars, function(v) {
   autofit() |>
   set_caption("Pairwise species differences with 95% CI (Tukey HSD)")
 ```
-
-</details>
 
 ![](Data_Cleaning_Visualisation_Statistical_Inference_files/figure-commonmark/anova-2.png)
 
@@ -530,15 +445,10 @@ mass was compatible with normality above (Shapiro p = 0.23), so a t-test
 is appropriate; the default Welch version does not assume equal
 variances.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 gentoo <- penguins |> filter(species == "Gentoo", !is.na(sex))
 t.test(body_mass_g ~ sex, data = gentoo)
 ```
-
-</details>
 
 
         Welch Two Sample t-test
@@ -561,15 +471,10 @@ A categorical-vs-categorical association test. Here I expect **no**
 association: the field team sampled both sexes in every species.
 `table()` drops the 9 birds of unknown sex automatically.
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 tab <- table(penguins$species, penguins$sex)
 tab
 ```
-
-</details>
 
                
                 female male
@@ -577,14 +482,9 @@ tab
       Chinstrap     34   34
       Gentoo        58   61
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 chisq.test(tab)
 ```
-
-</details>
 
 
         Pearson's Chi-squared test
@@ -597,15 +497,10 @@ no association between species and sex.
 
 ### 4.5 Flipper length vs body mass (correlation)
 
-<details open class="code-fold">
-<summary>Code</summary>
-
 ``` r
 # Pearson quantifies the linear relationship visible in the scatter plot above
 cor.test(penguins$flipper_length_mm, penguins$body_mass_g, method = "pearson")
 ```
-
-</details>
 
 
         Pearson's product-moment correlation
