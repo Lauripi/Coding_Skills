@@ -63,6 +63,7 @@ pacman::p_load(
 conflicts_prefer(dplyr::filter, dplyr::select, dplyr::lag, .quiet = TRUE)
 
 theme_set(theme_minimal(base_size = 12))
+set_flextable_defaults(background.color = "white")
 
 # the two groups of variables used throughout the script — defined once, reused everywhere
 cont_vars <- c("bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g")
