@@ -41,3 +41,37 @@ Python · scikit-learn · pandas · NumPy · matplotlib
 
 - `Predictive_model_on_breast_cancer.ipynb` — full analysis notebook
 - `README.md` — this file
+
+
+# Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference
+A reproducible R workflow showing how I handle a fresh dataset: checked cleaning decisions, the right summary for each variable type, and tests chosen from verified assumptions.
+
+## Overview
+Dataset: Palmer Penguins (344 penguins, 3 species, 4 body measurements plus sex and year)
+Task: do the species differ, and on what?
+Focus: methodological rigor over headline results : missing-data patterns checked before dropping anything, normality tested before choosing tests, omnibus tests followed by post hoc comparisons
+Results at a glance
+Question Result
+Rows dropped 2 of 344 (no measurements at all)
+Species differences Gentoo differ on every measurement; Adelie and Chinstrap differ only by bill length
+Sexual dimorphism (Gentoo) Males ~800 g heavier
+Sex × species association None (p ≈ 0.98)
+Flipper length vs body mass r = 0.87
+
+## Methodology
+Cleaning : missing values audited per variable, the 2 empty rows identified by code, birds of unknown sex kept, range check on every numeric variable.
+Description & visualisation : counts for categorical variables, mean ± SD and median (Q1/Q3) per species for continuous ones; density, scatter and violin plots, including a textbook Simpson's paradox on bill shape.
+Inference : Shapiro–Wilk normality check, ANOVA and Kruskal–Wallis side by side, Tukey post hoc, Welch t-test, chi-square, Pearson correlation.
+
+## Skills demonstrated
+Statistical rigor: assumption checking, omnibus vs post hoc tests, confounding and Simpson's paradox
+Data wrangling in R: tidyverse pipelines (dplyr, tidyr, purrr), long/wide reshaping
+Visualisation: ggplot2, patchwork
+Reproducible reporting: Quarto, flextable, everything loaded from packages
+
+## Tech stack
+R · tidyverse · Quarto · flextable · patchwork · ggbeeswarm · wrappedtools
+
+## Repository contents
+Data_Cleaning_Visualisation_Statistical_Inference.qmd — full analysis (Quarto source)
+Data_Cleaning_Visualisation_Statistical_Inference.md — rendered results, viewable on GitHub
