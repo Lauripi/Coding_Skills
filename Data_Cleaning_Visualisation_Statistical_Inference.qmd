@@ -17,20 +17,20 @@ execute:
 editor: visual
 ---
 
-## Goal of this script   
+## Goal of this script
 
 The Palmer Penguins dataset records body measurements for three penguin species (*Adelie*, *Chinstrap*, *Gentoo*) collected on three islands of the Palmer Archipelago. I use it here as a compact end-to-end demonstration of how I approach a fresh dataset:
 
 1.  inspect and **clean** the data (types, missing values, plausibility),
 2.  **describe** it with the right summaries for each variable type,
-3.  **visualise** the structure to generate hypotheses,
+3.  **visualize** the structure to generate hypotheses,
 4.  test those hypotheses with appropriate **inferential statistics**.
 
 The aim is not to discover anything new about penguins, but to show a clean and reproducible workflow.
 
 ## Setup
 
-Everything loads from packages, so the script is fully reproducible — no local files involved.
+Everything loads from packages, so the script is fully reproducible, no local files involved.
 
 ```{r}
 #| label: setup
@@ -46,7 +46,6 @@ pacman::p_load(
   ggbeeswarm        # jittered points without overlap
 )
 
-# settle the usual namespace clashes once, explicitly
 conflicts_prefer(dplyr::filter, dplyr::select, dplyr::lag, .quiet = TRUE)
 
 theme_set(theme_minimal(base_size = 12))
@@ -78,39 +77,26 @@ raw |>
   set_caption("Missing values per variable")
 ```
 
-Two patterns: `sex` is missing for 11 birds, and each of the four measurements is missing for exactly 2 birds. Are those the *same* 2 birds? Rather than trusting my eyes, I check it:
-<<<<<<< HEAD
+2 patterns: `sex` is missing for 11 birds, and each of the four measurements is missing for exactly 2 birds. Are those the *same* 2 birds? Rather than trusting my eyes, I check it:
 
 ```{r}
-#| label: empty-rows
-# rows where every measurement is NA
-raw |> filter(if_all(all_of(cont_vars), is.na))
-```
-
-Yes — 2 penguins have **no body measurements at all**; these rows carry no information for an analysis of size. My decisions:
-=======
->>>>>>> 03f663fa91c592832186499f4bb09e756694c560
-
-```{r}
-#| label: empty-rows
 # rows where every measurement is NA
 raw |> filter(if_all(all_of(cont_vars), is.na))
 ```
 
 Yes — 2 penguins have **no body measurements at all**; these rows carry no information for an analysis of size. My decisions:
 
--   drop the 2 rows with no measurements (they cannot contribute to any numeric analysis),
--   **keep** the birds with unknown sex — they still have valid measurements, so I only exclude them from sex-specific tests rather than throwing the whole row away.
+- drop the 2 rows with no measurements (they cannot contribute to any numeric analysis),
+- **keep** the birds with unknown sex — they still have valid measurements, so I only exclude them from sex-specific tests rather than throwing the whole row away.
 
-I also recode `year` as a factor (it is a label, not a quantity) and add two derived variables I find useful: the bill aspect ratio and body mass in kg.
+I also recode `year` as a factor (it is a label, not a quantity) and add one derived variable: the bill ratio (length ÷ depth), a unit-free measure of bill *shape* rather than size, which I come back to in section 3.
 
 ```{r}
 #| label: clean
 penguins <- raw |>
   mutate(
-    year         = factor(year),
-    bill_ratio   = bill_length_mm / bill_depth_mm,
-    body_mass_kg = body_mass_g / 1000
+    year       = factor(year),
+    bill_ratio = bill_length_mm / bill_depth_mm
   ) |>
   # remove only the rows where *all* measurements are missing
   filter(!if_all(all_of(cont_vars), is.na))
@@ -135,7 +121,7 @@ penguins |>
   set_caption("Range of every numeric variable")
 ```
 
-All ranges are biologically sensible (bills 32–60 mm long and 13–22 mm deep, flippers 172–231 mm, mass 2.7–6.3 kg), so no further correction is needed. The data is now tidy.
+All ranges are biologically sensible (bills 32–60 mm long and 13–22 mm deep, flippers 172–231 mm, mass 2.7–6.3 kg, bill ratio 1.6–3.6), so no further correction is needed. The data is now tidy.
 
 ## 2. Descriptive statistics
 
@@ -156,7 +142,7 @@ penguins |>
   set_caption("Composition of the sample")
 ```
 
-**Continuous variables** are summarised both as mean ± SD and as median (Q1/Q3), split by species — because, as the plots below confirm, the species are very different animals and a pooled mean would be misleading.
+**Continuous variables** are summarized both as mean ± SD and as median (Q1/Q3), split by species because, as the plots below confirm, the species are very different animals and a pooled mean would be misleading.
 
 ```{r}
 #| label: desc-cont
@@ -177,7 +163,7 @@ penguins |>
   set_caption("Body measurements by species")
 ```
 
-## 3. Visualisation
+## 3. Visualization
 
 ### Distributions by species
 
@@ -195,9 +181,9 @@ wrap_plots(dens_plots, ncol = 2, guides = "collect") +
   theme(legend.position = "right")
 ```
 
-Flipper length and body mass clearly separate *Gentoo* from the other two; bill *depth* separates *Gentoo* (shallow bills) while bill *length* separates *Adelie* (short bills). No single measurement separates all three — which is exactly what makes the next plot interesting.
+Flipper length, bill depth and body mass clearly separate *Gentoo* from the other two; bill *depth* separates *Gentoo* (shallow bills) while bill *length* separates *Adelie* (short bills).
 
-### Bill shape & a textbook Simpson's paradox
+### Bill shape as an illustration of Simpson's paradox
 
 ```{r}
 #| label: fig-simpson
@@ -217,7 +203,24 @@ p_bysp <- ggplot(penguins, aes(bill_length_mm, bill_depth_mm, colour = species))
 p_pooled + p_bysp
 ```
 
-Pooled across species the two bill dimensions look *negatively* correlated, but **within** every species the relationship is *positive*. This sign reversal is a classic Simpson's paradox: a good reminder to always check whether a confounder (here, species) is driving an association.
+Pooled across species the 2 bill dimensions look *negatively* correlated, but **within** every species the relationship is *positive*. This sign reversal is a classic Simpson's paradox: a good reminder to always check whether a confounder (here species) is driving an association.
+
+### Bill ratio: combination of 2 varibles in 1
+
+In the scatter plot above, each species forms its own cloud of points, and what sets them apart is the proportion between bill length and depth rather than either value alone. That is what the bill ratio from the cleaning step captures
+
+```{r}
+#| label: fig-ratio
+ggplot(penguins, aes(species, bill_ratio, fill = species)) +
+  geom_violin(alpha = 0.35, colour = NA) +
+  geom_beeswarm(alpha = 0.45, size = 0.8) +
+  stat_summary(fun = median, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(title = "One derived variable separates all three species",
+       x = NULL, y = "Bill ratio (length / depth)") +
+  theme(legend.position = "none")
+```
+
+Medians of 2.14 (*Adelie*), 2.66 (*Chinstrap*) and 3.17 (*Gentoo*). Species differ in bill *shape* more than in bill *size*.
 
 ### Flipper length vs body mass
 
@@ -239,7 +242,7 @@ ggplot(penguins, aes(species, body_mass_g, fill = species)) +
   geom_violin(alpha = 0.35, colour = NA) +
   geom_beeswarm(alpha = 0.45, size = 0.8) +
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
-  labs(x = NULL, y = "Body mass (g)") +
+  labs(title = "Gentoo penguins are heavier", x = NULL, y = "Body mass (g)") +
   theme(legend.position = "none")
 ```
 
@@ -283,9 +286,26 @@ tibble(Variable = cont_vars) |>
   autofit() |>
   set_caption("Species differences: parametric (ANOVA) vs non-parametric (Kruskal–Wallis)") |>
   add_footer_lines("Both tests are reported for every variable, so the conclusion does not rely on the normality assumption.")
+
+# which pairs of species differ, and by how much? Tukey HSD controls the error rate across the 3 comparisons
+map(cont_vars, function(v) {
+  TukeyHSD(aov(reformulate("species", v), data = penguins))$species |>
+    as_tibble(rownames = "Comparison") |>
+    mutate(Variable = v, .before = 1)
+}) |>
+  list_rbind() |>
+  mutate(across(c(diff, lwr, upr), ~ round(.x, 1)),
+         `p adj` = formatP(`p adj`, mark = TRUE)) |>
+  flextable() |>
+  theme_booktabs() |>
+  merge_v(j = "Variable") |>
+  autofit() |>
+  set_caption("Pairwise species differences with 95% CI (Tukey HSD)")
 ```
 
-Both tests agree: every measurement differs between species (p \< 0.001), and the conclusion does not depend on the normality assumption.
+The ANOVA/KW tests only tell me that at least one species differs. To know which pairs differ, I use Tukey's test : it compares each pair of species and corrects the p-values for the three comparisons made at once (I use it rather than pairwise Wilcoxon tests because the groups are large, so the comparison of means is robust to the mild non-normality seen in 4.1).
+
+Gentoo differ from both other species on every measurement. Adelie and Chinstrap have no significant difference in body size and bill depth.
 
 ### 4.3 Sexual dimorphism in body mass (two-sample t-test)
 
@@ -324,12 +344,6 @@ A strong positive linear relationship (*r* ≈ 0.87, 95% CI 0.84–0.89), matchi
 
 ## Summary
 
-<<<<<<< HEAD
 - **Cleaning:** 2 of 344 rows had no measurements and were dropped; 9 birds of unknown sex were kept and excluded only from sex-specific tests. All numeric ranges are biologically plausible.
-- **Structure:** the three species have distinct phenotypes, and species confounds the bill length–depth relationship (Simpson's paradox).
-- **Inference:** every measurement differs between species (parametric and non-parametric tests agree); Gentoo males are \~800 g heavier than females; sex is balanced across species; flipper length and body mass are strongly correlated (*r* ≈ 0.87).
-=======
--   **Cleaning:** 2 of 344 rows had no measurements and were dropped; 9 birds of unknown sex were kept and excluded only from sex-specific tests. All numeric ranges are biologically plausible.
--   **Structure:** the three species have distinct phenotypes, and species confounds the bill length–depth relationship (Simpson's paradox).
--   **Inference:** every measurement differs between species (parametric and non-parametric tests agree); Gentoo males are \~800 g heavier than females; sex is balanced across species; flipper length and body mass are strongly correlated (*r* ≈ 0.87).
->>>>>>> 03f663fa91c592832186499f4bb09e756694c560
+- **Structure:** the three species have distinct phenotypes; species confounds the bill length–depth relationship (Simpson's paradox), and the derived bill ratio separates the species better than any raw measurement.
+- **Inference:** Gentoo differ from the other two species on every measurement, while Adelie and Chinstrap share the same body size and differ only by bill length (Tukey post hoc); Gentoo males are \~800 g heavier than females; sex is balanced across species; flipper length and body mass are strongly correlated (r ≈ 0.87).
