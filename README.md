@@ -48,15 +48,6 @@ A reproducible R workflow showing how I handle a fresh dataset: checked cleaning
 
 ## Overview
 Dataset: Palmer Penguins (344 penguins, 3 species, 4 body measurements plus sex and year)
-Task: do the species differ, and on what?
-Focus: methodological rigor over headline results : missing-data patterns checked before dropping anything, normality tested before choosing tests, omnibus tests followed by post hoc comparisons
-Results at a glance
-Question Result
-Rows dropped 2 of 344 (no measurements at all)
-Species differences Gentoo differ on every measurement; Adelie and Chinstrap differ only by bill length
-Sexual dimorphism (Gentoo) Males ~800 g heavier
-Sex × species association None (p ≈ 0.98)
-Flipper length vs body mass r = 0.87
 
 ## Methodology
 Cleaning : missing values audited per variable, the 2 empty rows identified by code, birds of unknown sex kept, range check on every numeric variable.
