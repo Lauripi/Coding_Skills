@@ -73,5 +73,5 @@ Reproducible reporting: Quarto, flextable, everything loaded from packages
 R · tidyverse · Quarto · flextable · patchwork · ggbeeswarm · wrappedtools
 
 ## Repository contents
-Data_Cleaning_Visualisation_Statistical_Inference.qmd — full analysis (Quarto source)
 Data_Cleaning_Visualisation_Statistical_Inference.md — rendered results, viewable on GitHub
+Data_Cleaning_Visualisation_Statistical_Inference_files — tables and graphs used by .md file
