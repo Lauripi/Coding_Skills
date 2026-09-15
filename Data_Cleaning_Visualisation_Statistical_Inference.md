@@ -1,4 +1,4 @@
-# Palmer Penguins — Data Cleaning, Visualisation & Statistical Inference
+# Palmer Penguins — Data Cleaning, visualisation, statistical_inference with R
 Lauriane Pous
 
 - [Goal of this script](#goal-of-this-script)
