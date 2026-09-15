@@ -1,4 +1,4 @@
-# Breast Cancer Classification - Model Building, Predictor Selection and Validation
+# Breast Cancer Classification - Model Building, Predictor Selection and Validation - Python 
 
 A complete, leakage-aware machine learning pipeline for classifying breast tumors as malignant or benign. It is built not just to chase accuracy, but to produce a model whose feature selection and decision threshold can actually be defended and explained.
 
@@ -43,7 +43,7 @@ Python · scikit-learn · pandas · NumPy · matplotlib
 - `README.md` — this file
 
 
-# Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference
+# Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference - R 
 A reproducible R workflow showing how I handle a fresh dataset: checked cleaning decisions, the right summary for each variable type, and tests chosen from verified assumptions.
 
 ## Overview
