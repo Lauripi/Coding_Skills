@@ -1,3 +1,0 @@
-[1,"==> quarto preview Data_Cleaning_Visualisation_Statistical_Inference.qmd --to html --no-watch-inputs --no-browse\n\n"]
-[1,"\r\n\r\nprocessing file: Data_Cleaning_Visualisation_Statistical_Inference.qmd\r\nError in parse_block(g[-1], g[1], params.src, markdown_mode) : \r\n  Duplicate chunk label 'empty-rows', which has been used for the chunk:\r\n# rows where every measurement is NA\r\nraw |> filter(if_all(all_of(cont_vars), is.na))\r\nCalls: .main ... process_file -> split_file -> lapply -> FUN -> parse_block\r\nExecution halted\r\n"]
-[1,"WARN: Error encountered when rendering files\n"]
