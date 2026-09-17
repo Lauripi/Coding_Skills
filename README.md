@@ -1,4 +1,4 @@
-# Breast Cancer Classification - Model Building, Predictor Selection and Validation - Python 
+# 1. Breast Cancer Classification - Model Building, Predictor Selection and Validation - Python 
 
 A complete, leakage-aware machine learning pipeline for classifying breast tumors as malignant or benign. It is built not just to chase accuracy, but to produce a model whose feature selection and decision threshold can actually be defended and explained.
 
@@ -43,7 +43,7 @@ Predictive_model_on_breast_cancer.ipynb — full analysis notebook
 
 
 
-# Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference - R 
+# 2. Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference - R 
 A reproducible R workflow showing how I handle a fresh dataset: checked cleaning decisions, the right summary for each variable type, and tests chosen from verified assumptions.
 
 ## Overview
@@ -68,7 +68,7 @@ Data_Cleaning_Visualisation_Statistical_Inference.md — rendered results, viewa
 Data_Cleaning_Visualisation_Statistical_Inference_files — tables and graphs used by .md file
 
 
-# SQL Exercises
+# 3. SQL Exercises
 
 ## Overview : 
 This file contains MySQL exercises focused on relational database design and basic SQL programming and was created to practice structuring relational databases and applying SQL concepts to scientific datasets.
