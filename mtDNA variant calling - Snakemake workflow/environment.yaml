@@ -1,0 +1,35 @@
+# Conda environment for the mtDNA variant-calling workflow.
+# Same tools as the course environment (exercise snakemake on PCR reads/environment.yaml),
+# plus pandas for the Python summary step.
+#
+#   mamba env create -n ngs -f environment.yaml
+#   mamba activate ngs
+#
+# For MultiQC's static plot export (multiqc --export, used by the summary step) kaleido
+# needs a Chrome browser inside Linux/WSL - once, after activating the environment:
+#   sudo apt install -y libnss3 libnspr4 libasound2t64   # Chrome's system libraries
+#   plotly_get_chrome -y                                 # downloads "Chrome for Testing"
+name: ngs
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - snakemake-minimal >=9.7.1
+  - jinja2
+  - pygments
+  - graphviz          # for `snakemake --dag | dot -Tpng > dag.png`
+  - matplotlib
+  - pandas
+  - pysam =0.22
+  - fastqc
+  - trimmomatic
+  - multiqc
+  - bwa ~=0.7.17
+  - samtools >=1.19
+  - bcftools >=1.19
+  - freebayes
+  - qualimap
+  - picard
+  - igv-reports >=1.16   # IGV view of the variants as a standalone HTML (rule igv_report)
+  - python-kaleido >=1   # PNG export of the MultiQC plots (needs Chrome, see above)

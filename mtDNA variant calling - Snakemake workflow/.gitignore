@@ -1,0 +1,16 @@
+# Raw reads and heavy pipeline outputs are not committed (GitHub refuses files > 100 MB).
+# Kept in git: Snakefile, config.yaml, environment.yaml, scripts/, README.md,
+#              06_multiqc/ (report + plots), 07_vcf/, 08_summary/ and 09_igv/ (small result files).
+*.fastq
+*.fastq.gz
+chrM.fasta.*
+01_fastqc_raw/
+02_trimmed/
+03_fastqc_posttrim/
+04_bam/
+05_qualimap/
+06_multiqc/multiqc_data/
+06_multiqc/multiqc_plots/pdf/
+06_multiqc/multiqc_plots/svg/
+.snakemake/
+logs/
