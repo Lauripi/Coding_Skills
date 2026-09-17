@@ -1,5 +1,0 @@
-sample,reads_in_bam,mapped_reads,mapped_pct,unmapped_reads,mean_coverage_x,std_coverage_x,breadth_of_coverage_1x_pct,breadth_of_coverage_10x_pct,mean_mapping_quality,error_rate_pct,mismatches,insertions,deletions,duplication_rate_pct,gc_pct
-Blood_PCR1,32727,32727,100.0,0,145.2,12.2,100.0,99.99,59.98,0.23,5345,93,208,65.18,44.49
-Blood_PCR2,32833,32833,100.0,0,146.5,11.1,100.0,99.99,59.98,0.24,5634,116,231,70.72,44.5
-Cheek_PCR1,32775,32775,100.0,0,146.0,11.4,100.0,99.99,59.98,0.23,5350,114,216,66.67,44.39
-Cheek_PCR2,32771,32771,100.0,0,145.6,11.9,100.0,99.99,59.98,0.24,5793,103,214,65.86,44.51
