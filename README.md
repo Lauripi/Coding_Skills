@@ -37,10 +37,10 @@ A complete, leakage-aware machine learning pipeline for classifying breast tumor
 
 Python · scikit-learn · pandas · NumPy · matplotlib
 
-## Repository contents
+## File
 
-- `Predictive_model_on_breast_cancer.ipynb` — full analysis notebook
-- `README.md` — this file
+Predictive_model_on_breast_cancer.ipynb — full analysis notebook
+
 
 
 # Palmer Penguins - Data Cleaning, Visualisation and Statistical Inference - R 
@@ -63,6 +63,28 @@ Reproducible reporting: Quarto, flextable, everything loaded from packages
 ## Tech stack
 R · tidyverse · Quarto · flextable · patchwork · ggbeeswarm · wrappedtools
 
-## Repository contents
+## File/ Repository
 Data_Cleaning_Visualisation_Statistical_Inference.md — rendered results, viewable on GitHub
 Data_Cleaning_Visualisation_Statistical_Inference_files — tables and graphs used by .md file
+
+
+# SQL Exercises
+
+## Overview : 
+This file contains MySQL exercises focused on relational database design and basic SQL programming and was created to practice structuring relational databases and applying SQL concepts to scientific datasets.
+Two example databases are included: a **laboratory database** for experiments, employees, tools, and results, and a **greenhouse database** for plants, gardeners, and greenhouse management.
+
+## Skills demonstrated
+
+* Creation of databases and tables
+* Primary and foreign keys
+* Constraints such as `CHECK`, `UNIQUE`, and `NOT NULL`
+* Many-to-many relationships
+* Stored procedures
+* Subqueries and filtering
+
+## File
+SQL_Stored_Procedures_and_Database_Creation (code only)
+
+
+
