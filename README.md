@@ -50,8 +50,8 @@ A reproducible R workflow showing how I handle a fresh dataset: checked cleaning
 Dataset: Palmer Penguins (344 penguins, 3 species, 4 body measurements plus sex and year)
 
 ## Methodology
-Cleaning : missing values audited per variable, the 2 empty rows identified by code, birds of unknown sex kept, range check on every numeric variable.
-Description & visualisation : counts for categorical variables, mean ± SD and median (Q1/Q3) per species for continuous ones; density, scatter and violin plots, including a textbook Simpson's paradox on bill shape.
+Cleaning : missing values per variable, the 2 empty rows identified by code, birds of unknown sex kept, range check on every numeric variable.
+Description and visualisation : counts for categorical variables, mean ± SD and median (Q1/Q3) per species for continuous ones; density, scatter and violin plots, including a textbook Simpson's paradox on bill shape.
 Inference : Shapiro–Wilk normality check, ANOVA and Kruskal–Wallis side by side, Tukey post hoc, Welch t-test, chi-square, Pearson correlation.
 
 ## Skills demonstrated
