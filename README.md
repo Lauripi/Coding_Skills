@@ -86,5 +86,39 @@ Two example databases are included: a **laboratory database** for experiments, e
 ## File
 SQL_Stored_Procedures_and_Database_Creation (code only)  
 
+# 4. Crime Incidents - Data Cleaning and Preprocessing - Python
+**Under preparation!! -> data visualization and analysis soon added**
 
+A Python data-cleaning workflow applied to a deliberately messy simulated crime dataset. The project focuses on identifying and correcting realistic data-quality problems while keeping cleaning decisions transparent and avoiding unjustified data imputation.
+
+## Overview
+
+- **Dataset:** simulated crime incident dataset with more than 5,000 records and information on crimes, locations, victims, suspects, officers, arrests, property loss and case status
+- **Task:** transform inconsistent raw data into an analysis-ready dataset
+- **Focus:** duplicate removal, datatype correction, categorical harmonization, missing-data handling, validation of numeric values and standardization of heterogeneous date/time information
+
+## Methodology
+
+1. **Initial data audit** : inspected datatypes, missing values, duplicate records, categorical levels and numerical ranges to identify the main data-quality problems.
+2. **Text and datatype standardization** : removed leading/trailing and repeated whitespace, standardized capitalization, converted identifiers to appropriate string formats and coerced incorrectly stored numerical variables to numeric values.
+3. **Categorical cleaning** : detected potential spelling errors using string similarity (`difflib`), manually reviewed suggested corrections and harmonized abbreviations and synonyms across variables such as crime type, district, weapon, severity, case status and reporting method.
+4. **Missing-data handling** : evaluated missingness variable by variable rather than applying a single imputation strategy. Missing victim and suspect gender values were inferred from available first names using `gender-guesser`, with imputed and uncertain values explicitly flagged.
+5. **Numeric and geographic validation** : inspected numerical distributions and plausible ranges, converted invalid values to missing where appropriate, and checked latitude/longitude against valid geographic ranges.
+6. **Date and time preprocessing** : separated mixed date/time information, converted heterogeneous date formats to pandas datetime values and derived analysis-ready variables including time of day and season.
+
+## Skills demonstrated
+
+- **Data cleaning:** missing-value assessment, duplicate detection, datatype conversion, string normalization, outlier and range validation
+- **Categorical data preprocessing:** typo detection, synonym harmonization, category reduction and manual quality control
+- **Pragmatic missing-data handling:** selective imputation, preservation of unavailable information and explicit imputation/uncertainty flags
+- **Feature engineering:** extraction and standardization of dates and times, creation of time-of-day and seasonal variables
+- **Reproducible preprocessing:** systematic checks before and after transformations rather than manual row-by-row correction
+
+## Tech stack
+
+Python · pandas · NumPy · difflib · gender-guesser · matplotlib
+
+## File
+
+Crimes_cleaning_data.ipynb — full data-cleaning notebook
 
