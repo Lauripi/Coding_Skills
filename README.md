@@ -86,39 +86,60 @@ Two example databases are included: a **laboratory database** for experiments, e
 ## File
 SQL_Stored_Procedures_and_Database_Creation (code only)  
 
-# 4. Crime Incidents - Data Cleaning and Preprocessing - Python
-**Under preparation!! -> data visualization and analysis soon added**
+# 4. Crime Incidents - Data Cleaning, Exploration and Statistical Analysis - Python
 
-A Python data-cleaning workflow applied to a deliberately messy simulated crime dataset. The project focuses on identifying and correcting realistic data-quality problems while keeping cleaning decisions transparent and avoiding unjustified data imputation.
+A Python workflow applied to a messy, simulated crime dataset: from raw data with realistic quality problems to an analysis-ready table, followed by exploratory analysis and statistical tests. Cleaning decisions are checked and explained, and imputed values are flagged rather than hidden.
 
 ## Overview
 
-- **Dataset:** simulated crime incident dataset with more than 5,000 records and information on crimes, locations, victims, suspects, officers, arrests, property loss and case status
-- **Task:** transform inconsistent raw data into an analysis-ready dataset
-- **Focus:** duplicate removal, datatype correction, categorical harmonization, missing-data handling, validation of numeric values and standardization of heterogeneous date/time information
+- **Dataset:** simulated crime incident dataset from Kaggle [(https://www.kaggle.com/datasets/sananshaikh/messy-crime-dataset-for-data-cleaning-practice)], 5,250 records describing crimes, locations, victims, suspects, officers, arrests, property loss and case status
+- **Task:** clean the raw data, then use it to answer three analysis questions
+- **Focus:** transparent cleaning decisions, checks before and after each transformation, and statistical tests chosen to fit the data
+
+## Cleaning at a glance
+
+| Problem | Action | Result |
+|---|---|---|
+| Duplicate records | Removed | 5,250 → 5,050 rows |
+| Typos, abbreviations and synonyms | Similarity detection (`difflib`) + manual review | e.g. crime type: 58 spellings → 4 categories; district: 16 → 10 |
+| Malformed amounts (e.g. `35446.9.0`) | Repaired before numeric conversion | 136 values recovered |
+| Three date formats, incl. US month-first | Each format converted explicitly | No swapped days and months |
+| Impossible values (negative numbers, ages up to 298, latitudes > 90) | Sign corrected or set to missing | 331 ages and 176 coordinates set to missing |
+| Missing victim/suspect gender | Inferred from first names (`gender-guesser`) | 1,964 values imputed and flagged |
 
 ## Methodology
 
-1. **Initial data audit** : inspected datatypes, missing values, duplicate records, categorical levels and numerical ranges to identify the main data-quality problems.
-2. **Text and datatype standardization** : removed leading/trailing and repeated whitespace, standardized capitalization, converted identifiers to appropriate string formats and coerced incorrectly stored numerical variables to numeric values.
-3. **Categorical cleaning** : detected potential spelling errors using string similarity (`difflib`), manually reviewed suggested corrections and harmonized abbreviations and synonyms across variables such as crime type, district, weapon, severity, case status and reporting method.
-4. **Missing-data handling** : evaluated missingness variable by variable rather than applying a single imputation strategy. Missing victim and suspect gender values were inferred from available first names using `gender-guesser`, with imputed and uncertain values explicitly flagged.
-5. **Numeric and geographic validation** : inspected numerical distributions and plausible ranges, converted invalid values to missing where appropriate, and checked latitude/longitude against valid geographic ranges.
-6. **Date and time preprocessing** : separated mixed date/time information, converted heterogeneous date formats to pandas datetime values and derived analysis-ready variables including time of day and season.
+1. **Initial data audit:** inspected datatypes, missing values, duplicates, categorical levels and numeric ranges to identify the main data-quality problems.
+2. **Text and datatype standardization:** trimmed whitespace, standardized capitalization, stored identifiers as text and converted wrongly stored numbers to numeric values.
+3. **Categorical cleaning:** detected spelling errors by string similarity, reviewed every suggested correction manually, harmonized abbreviations and synonyms, and grouped crime types into four broad categories.
+4. **Missing-data handling:** assessed missingness variable by variable instead of applying one imputation rule; imputed gender from first names with explicit imputation and uncertainty flags, and left other missing values as missing.
+5. **Numeric and geographic validation:** checked distributions and plausible ranges, corrected sign errors and set impossible values to missing.
+6. **Date and time preprocessing:** split date and time, standardized three date formats, and created time-of-day and season variables.
+7. **Exploration and analysis:** described the main variables (summary statistics, bar charts, histograms), then answered three questions with statistical tests. Numeric variables are not normally distributed, so non-parametric tests were used where needed.
+
+## Results at a glance
+
+| Question | Test | Result |
+|---|---|---|
+| Do incident counts differ between cities? | Chi-square goodness-of-fit | Yes (χ² = 15.6, p = 0.03); Riverside has the most incidents (705) |
+| Does the crime-type mix differ between cities? | Chi-square test of independence | No (p = 0.26) |
+| Did incidents change over time (2018–2024)? | Poisson regression on monthly counts | No significant trend (+1.1% per year, p = 0.12) |
+| Do incidents vary by season? | Chi-square goodness-of-fit | No (p = 0.32) |
+| Is crime severity linked to property loss? | Kruskal–Wallis, Spearman correlation | No (p = 0.79; ρ = 0.01, p = 0.39) |
 
 ## Skills demonstrated
 
-- **Data cleaning:** missing-value assessment, duplicate detection, datatype conversion, string normalization, outlier and range validation
-- **Categorical data preprocessing:** typo detection, synonym harmonization, category reduction and manual quality control
-- **Pragmatic missing-data handling:** selective imputation, preservation of unavailable information and explicit imputation/uncertainty flags
-- **Feature engineering:** extraction and standardization of dates and times, creation of time-of-day and seasonal variables
-- **Reproducible preprocessing:** systematic checks before and after transformations rather than manual row-by-row correction
+- **Data cleaning:** duplicate detection, datatype conversion, string normalization, range validation, handling of mixed date formats
+- **Categorical preprocessing:** typo detection, synonym harmonization, category grouping and manual quality control
+- **Missing-data handling:** variable-by-variable assessment, selective imputation with explicit flags
+- **Feature engineering:** time-of-day and season variables derived from raw timestamps
+- **Statistics:** chi-square tests, Poisson regression for count data, non-parametric tests (Kruskal–Wallis, Spearman) chosen after checking distributions
+- **Visualization:** bar charts, histograms, box plots and trend plots with matplotlib
 
 ## Tech stack
 
-Python · pandas · NumPy · difflib · gender-guesser · matplotlib
+Python · pandas · NumPy · SciPy · statsmodels · matplotlib · difflib · gender-guesser
 
 ## File
 
-Crimes_cleaning_data.ipynb — full data-cleaning notebook
-
+Crimes_cleaning_data.ipynb 
