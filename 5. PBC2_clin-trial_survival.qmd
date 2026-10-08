@@ -1,0 +1,188 @@
+---
+title: "5. PBC2_clin-trial_survival"
+author: "Lauriane Pous"
+format: docx
+editor: visual
+---
+
+# Project description
+
+This project uses the `pbc2` dataset, which contains longitudinal clinical data from 312 patients with primary biliary cirrhosis (PBC) included in a randomized Phase 3 Mayo Clinic trial. Several measurements were collected repeatedly during follow-up, including serum bilirubin, cholesterol, albumin, alkaline phosphatase, SGOT, platelet count and prothrombin time. The dataset also contains patient characteristics, treatment group and clinical outcomes such as survival status or liver transplantation.
+
+The aim of this project is to evaluate if D-penicil treatment improved the survival of patients compared to controls.
+
+# 1. Data preparation and cleaning
+
+## a. Table loading and formatting
+
+I started with data exploration. This is important to verify how data look like and tries to spot inconsistencies. First I checked the number of rows and columns (1945, 20), column content and data type. Since patients may attend different visits corresponding to a row each, I looked at the number of patients (312) and the number of visits (range: 1-16, median = 5).
+
+Then I looked at the number of duplicates (0), empty rows (0) and NA number (1133).
+
+```{r}
+pacman::p_load(conflicted,tidyverse,wrappedtools, flextable, JMbayes2, dplyr, survival, survminer, broom)
+conflicts_prefer(survival::coxph)
+set_flextable_defaults(
+  font.size = 9,
+  padding.bottom = 2,
+  padding.top = 2,
+  padding.left = 4,
+  padding.right = 4
+)
+
+data("pbc2")
+
+# quick look on dimension, columns content and data type
+glimpse(pbc2)
+
+# change column name
+pbc2 <- pbc2 |>
+  rename(
+    years_followup = years,
+    time_to_visit = year)
+
+# convert incorrect datatypes 
+pbc2$histologic <- as.factor(pbc2$histologic)
+
+# how many patients
+n_distinct(pbc2$id) 
+
+# range number of rows (visits) per patients
+pbc2 |>
+  count(id) |>
+  summarise(
+    min_rows = min(n),
+    max_rows = max(n),
+    median = median(n)
+    )
+
+# check if duplicates or empty rows and NA number
+sum(duplicated(pbc2))
+sum(apply(pbc2, 1, function(x) all(is.na(x) | x == "")))
+sum(is.na(pbc2))
+pbc2 |> summarise(
+  across(
+    everything(),
+    ~ sum(is.na(.x))
+  ))
+```
+
+## b. Inspect the categorical variables
+
+Categorical variables are already classified with levels. Missing values were observed for ascites, hepatomegaly, and spiders.
+
+```{r}
+# plot categorical variables
+pbc2 |>
+  distinct(id, .keep_all = TRUE) |>
+  select(where(is.factor), -id) |> 
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(vars(name), scales = "free")
+
+# check the categorical values options
+pbc2 |>
+  summarise(
+    across(
+      c(where(is.factor), -id),
+      list(
+        options = ~ paste(unique(na.omit(.x)), collapse = ", "),
+        missing = ~ sum(is.na(.x))
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(options|missing)$"
+  ) |>
+  flextable() |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+```
+
+## c. Inspect the numerical variables
+
+For numeric variables, I plotted the data from baseline visits to look at distribution. Alkaline, serBilir and serChol have a strong long tail. Mild tail is observed for SGOT and prothrombin,
+
+I also prepared a descriptive statistics table. We can see variables with very different value magnitudes and range widths, based on the minimum and maximum values. Some variables, such as alkaline and serChol, show a particularly wide spread. We also see missing values, especially for serChol, platelets and alkaline.
+
+```{r}
+# plot numeric variables
+pbc2 |>
+  distinct(id, .keep_all = TRUE) |>
+  select(where(is.numeric), -status2) |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_histogram() +
+  facet_wrap(vars(name), scales = "free")
+
+# check the numeric value range
+pbc2 |>
+  summarise(
+    across(
+      where(is.numeric),
+      list(
+        min = ~ round(min(.x, na.rm = TRUE), 2),
+        max = ~ round(max(.x, na.rm = TRUE), 2),
+        mean = ~ round(mean(.x, na.rm = TRUE), 2),
+        median = ~ round(median(.x, na.rm = TRUE), 2),
+        sd = ~ round(sd(.x, na.rm = TRUE), 2),
+        missing = ~ sum(is.na(.x))
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(min|max|mean|median|sd|missing)$"
+  ) |>
+  flextable() |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+```
+
+# 2. Comparison of survival of patients treated with D-penicil vs placebo
+
+To see if the experimental arm (D-penicil-treated patients) obtained better survival rates than the control arm (placebo patients), I used Kaplan-Meier curve. I started with censoring, meaning deciding what is considered as the end of the trial. In our case alive and trasnplanted were considered as censored, and we counted the number of deaths over the follow up period.
+
+```{r}
+# check how many patients received transplantation per drug group
+pbc2 |>
+  group_by(drug) |>
+  summarise(
+    transplanted = n_distinct(id[status == "transplanted"])
+  )
+
+# create an event new column for km
+pbc2_km <- pbc2 |>
+  distinct(id, .keep_all = TRUE) |>
+   mutate(
+     event = ifelse(status == "dead", 1, 0)
+  )
+
+# create Kaplan-Meier model
+km_fit <- survfit(
+  Surv(years_followup, event) ~ drug,
+  data = pbc2_km
+)
+
+# check how data look like
+options(width = 200)
+summary(km_fit)
+
+ggsurvplot(
+  km_fit,
+  data = pbc2_km,
+  risk.table = TRUE,
+  pval = TRUE,
+  conf.int = TRUE
+)
+```
+
+**Interpretation** : The survival curves of treated and placebo patients strongly overlap and the log-rank test confirmed no statistically difference between them (p=0,99), indicating that the treatment did not improve the survival of the patients.
+
+# 3. Identification of the risk factors
+
+IN PREPARATION !!
