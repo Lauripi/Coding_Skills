@@ -106,7 +106,7 @@ num_var |>
     names_pattern = "(.+)_(min|max|mean|median|sd|missing_num|missing_pct)$"
   ) |>
   flextable() |>
-  set_caption("Summary of numeric variables - all visits") |>
+  set_caption("Summary of numeric variables - Baseline") |>
   autofit() |>
   set_table_properties(layout = "autofit")
 
@@ -161,9 +161,9 @@ Tables:
 
   - serChol: 821 NA (42%), alkaline: 60 (3%), platelets: 73 (4%)
 
-## c. Handling numeric missing values
+## c. **Investigate why data are missing**
 
-before deciding what to do with missing values, I have to understand why these data are missing. I will check if there is a pattern in data missingness : data missing in one specific arm or at some specific visits ? do data from a variable miss in the same time as the ones of another variable ? are missing values correlated to the patient state?
+Before deciding how to handle missing values, I first need to investigate the pattern and possible reasons for missingness. I will assess whether missing data are concentrated in a specific treatment arm or at particular visits, whether missingness in one variable tends to occur together with missingness in another variable, and whether missingness is associated with the patient’s clinical status.
 
 ```{r}
 # check if cluster of NA by arm
@@ -265,13 +265,15 @@ pbc2 |>
   )
 ```
 
+**Interpretation:**
+
 - data missing per arm : no specific pattern, data missingness not related to treatment
 
-- From data missingness per visit : it looks like platelets and alkaline have same pattern of missingness, with 2 peaks at visits 11 and 13, but stays overall low (max a bit above 12%). For choline, around 90% of patients miss data at visit 2, missingness stay high at several visits (above 25% at visits 3-8 ).
+- From data missingness per visit : it looks like platelets and alkaline have same pattern of missingness, with 2 peaks at visits 11 and 13, but stays overall low (max a bit above 12%). For serChol, around 90% of patients miss data at visit 2, missingness stay high at several visits (above 25% at visits 3-8 ), so missingness is not completely random, suggesting a protocol decision (missing by design). Because it depends on an observed variable (the visit), it is consistent with MAR.
 
-- Data missing per patient state : I plotted the percentage of missing data per status and per grade. Higher proportion of missing values for dead patients. It is especially obvious for alkaline and platelets. It is even more obvious with patient disease severity, where we see for alkaline and platelets a strong missingness proportion at stage 4. serChol does not follow that logic.
+- Data missing per patient state : I plotted the percentage of missing data per status and per stage. Higher proportion of missing values for dead patients. It is especially obvious for alkaline and platelets. It is even more obvious with patient disease severity, where we see for alkaline and platelets a strong missingness proportion at stage 4. serChol does not follow that logic.
 
-**Conclusion** : serChol has too many missing data, should be excluded for further analyses. Missingness of alkaline and platelets is associated with disease severity (histologic stage 4, death), so it is not MCAR. It is consistent with MAR, but MNAR cannot be excluded.
+**Conclusion** : serChol has too many missing data, but the missing data pattern suggests it is MAR. It should be excluded for the longitudinal analyses. Missingness of alkaline and platelets is associated with disease severity (histologic stage 4, death), so it is not MCAR. It is consistent with MAR, but MNAR cannot be excluded.
 
 ## d. Inspect the categorical variables
 
@@ -399,11 +401,11 @@ ggsurvplot(
 
 **Interpretation** : The survival curves of treated and placebo patients strongly overlap and the log-rank test confirmed no statistically difference between them (p=0,99), indicating that the treatment did not improve the survival of the patients.
 
-# 3. Identification of the risk factors 
+# 3. Identification of the risk factors at baseline
 
-To identify which variables are associated with increase of decrease of death risk (hazard ratio), I used Cox regression model and plotted the results.
+For this section, I only look at baseline (i.e. the first visit), ignoring the follow-up visits. To identify which variables are associated with increase of decrease of death risk (hazard ratio), I used Cox regression model and plotted the results.
 
-## a. Selection of the number of coefficients
+## a. Variable selection
 
 First step is to decide which variables to include in the cox model. Currently, there are too many variables (15) for 18 coefficients (counts continuous variable as 1, factors as sum of levels -1 ). As a standard, I set a minimum of 10 events per coefficients (simulation studies showed that below this value, the estimates become unreliable (Peduzzi et al., 1995)).
 
@@ -419,10 +421,10 @@ To reduce the number of coefficients, I used several methods :
 # count number of events per coefficient
 sum(pbc2_km$event) / 18
 
-# 2. check if there are redundant variables
+# check if there are redundant variables
 ## numeric 
 cor_mat <- pbc2_km |>
-  select(albumin, alkaline, platelets, prothrombin, serBilir, SGOT) |>
+  select(albumin, alkaline, platelets, prothrombin, serBilir, SGOT, serChol) |>
   cor(use = "pairwise.complete.obs", method = "spearman")
 cor_mat
 
@@ -453,7 +455,7 @@ corrplot(
   number.cex = 0.7  
 )
 
-# 3. Reduce histologic levels
+# Reduce histologic levels
 pbc2_km <- pbc2_km |>
   mutate(
     histologic = fct_collapse(
@@ -476,60 +478,39 @@ pbc2_km |>
 
 Calculation of the max number of variables/coefficients : We have 7.7 events per coefficient (140 deaths divided by 18 coefficients), which is below the threshold of 10. It means I have to reduce variable number. The maximum number of coefficients is 140 / 10 = 14 .
 
-1.  Literature research showed that bilirubin, age, albumin, histology, hepatomegaly and ascites are relevant
+1.  Pre-1989 literature identified bilirubin, age, albumin, histologic stage, hepatomegaly and ascites as prognostic factors (Shapiro 1979; Roll 1983; Christensen 1985). Alkaline phosphatase, platelets, prothrombin time, serum cholesterol and SGOT were not studied there, but were added in the model for biological reasons: cholestasis, portal hypertension, liver function and liver-cell injury.
 
-2.  Removal of the redundant variables : for continuous variables, no strong correlation between variables. For categorical variables, ascites and edema are strongly correlated (corr = 0.60). Since literature has shown that ascites was a relevant prognostic factor for PBC, I excluded edema.
+    - SGOT was moderately correlated with bilirubin (r = 0.59) but kept as a marker of liver-cell injury.
 
-3.  Merging of levels : For histologic stage, stages 1 and 2 can be groupped together and represent the early stages of the disease.
+    - Spiders (a non-specific sign) and sex (only 36 men; balanced between arms, V = 0.06) were excluded. Adding them separately to the model did not change the other estimates.
+
+2.  Removal of the redundant variables : for continuous variables, no strong correlation between variables. For categorical variables, ascites and edema are strongly correlated (Cramér’s V = 0.60). Since literature has shown that ascites was a relevant prognostic factor for PBC, I excluded edema.
+
+3.  Merging of levels : For histologic stage, stages 1 and 2 can be grouped together and represent the early stages of the disease.
 
 We have now 7 variables corresponding to 8 coefficients : drug, age, bilirubin, albumin, histologic stage, hepatomegaly, and ascites. We have **140 deaths for 8 coefficients (about 17 per coefficient)**: it's above the minimum of 10, and no patient was dropped (n = 312).
 
 **To be done for a deeper analysis** : run an extended model with more variables to see whether it adds more prognostic information and whether the significant prognostic factors hold even when changing the model.
 
-## b. Do the variables at baseline influence HR ?
+## b. Evaluation of baseline risk factors
 
-For this section, I only look at baseline (i.e. the first visit), ignoring the follow-up visits. I created a main model, which kept as few variables as possible, and compared it to an extended model.
+I created a main model, which kept as few variables as possible, and compared it to an extended model.
 
-The extended model added log(alkaline phosphatase), platelets, prothrombin time and log(SGOT) (12 coefficients). SGOT was moderately correlated with bilirubin (r = 0.59) but kept as a marker of liver-cell injury. Both models were compared on the same 308 patients (4 missing platelet values).
-
-Spiders (a non-specific sign) and sex (only 36 men, and balanced by randomization) were excluded. Remark : Adding them separately to the main model did not change the results.
+### i. Evaluation of the main model
 
 ```{r}
-# main model :
+# model building
 cox_model <- coxph(
   Surv(years_followup, event) ~
-    drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites + age,
+    drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites,
   data = pbc2_km
-  )
+)
 summary(cox_model)
 
 ggforest(
   model = cox_model,
   data = pbc2_km
 )
-
-# extended model
-cox_model_ext <- coxph(
-  Surv(years_followup, event) ~
-    drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites + log(alkaline) + platelets + prothrombin + log(SGOT),
-  data = pbc2_km
-)
-summary(cox_model_ext)
-
-ggforest(
-  model = cox_model_ext,
-  data = pbc2_km
-)
-
-# compare main and extended models - drop NA values
-pbc2_cc <- pbc2_km |> drop_na(platelets)  
-
-main <- update(cox_model,    data = pbc2_cc)  
-extended <- update(cox_model_ext, data = pbc2_cc)
-
-anova(main, extended)
-AIC(main, extended)
-
 ```
 
 **Interpretation** :
@@ -544,8 +525,88 @@ AIC(main, extended)
 
 - Stage 3, hepatomegaly and ascites were not significantly associated with survival, and their wide confidence intervals suggest limited precision.
 
-  TO BE CONTINUED ...
+### ii. Data imputation and evaluation of the extended model
 
-## c. Do the variables accross the visits influence the HR ?
+The extended model includes log(alkaline phosphatase), platelets, prothrombin time, log(SGOT) and log(serChol) (13 coefficients). SGOT was moderately correlated with bilirubin (r = 0.59) but kept as a marker of liver-cell injury.
+
+Since serChol had a quite important number of missing values (9%), I chose to use mice package (multivariable imputation by chain equations). Excluding these patients would have reduced the sample and could have biased the results, since missingness may not be completely random. Multiple imputation (mice) fills in the missing values several times, based on the other variables, and combines the results. This keeps all patients and accounts for the uncertainty of the imputed values.
+
+```{r}
+pacman::p_load(mice)
+
+# prepare a new dataset with a new hazard column for the imputation 
+data_imp <- pbc2_km |>
+  drop_na(platelets) |>    # platelets: 4 patients removed
+  select(years_followup, event, drug, age, serBilir, albumin, histologic,
+         hepatomegaly, ascites, alkaline, platelets, prothrombin, SGOT, serChol)
+
+data_imp$hazard <- nelsonaalen(data_imp, years_followup, event)   # calculates for each patient how much risk of death has accumulated up to the end of follow-up
+
+# Missing serChol values imputation
+imp <- mice(data_imp, m = 5, seed = 123)
+
+# extended model on the 5 datasets
+fit <- with(imp, coxph(Surv(years_followup, event) ~ drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites + log(alkaline) + I(platelets/100) + prothrombin + log(SGOT) + log(serChol)))
+
+# main model on the same 5 datasets, for the comparison
+fit_main <- with(imp, coxph(Surv(years_followup, event) ~ drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites))
+
+# pooled HRs of the extended model
+pooled <- tidy(pool(fit), conf.int = TRUE) |>
+  mutate(
+    across(c(estimate, conf.low, conf.high), exp),               # coefficients -> HRs
+    p = ifelse(p.value < 0.001, "p < 0.001", paste0("p = ", round(p.value, 3))),
+    row_label = paste0(term, "   HR ", round(estimate, 2),
+                       " (", round(conf.low, 2), "–", round(conf.high, 2), "), ", p)
+  )
+pooled
+
+# forest plot
+ggplot(pooled, aes(x = estimate, y = fct_rev(fct_inorder(row_label)))) +
+  geom_point(shape = 15, size = 2.5) +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high), width = 0.2) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_log10() +
+  labs(
+    title = "Extended model (multiple imputation)",
+    x = "Hazard ratio (95% CI, log scale)",
+    y = NULL
+  )
+```
+
+**Interpretation:**
+
+- D-penicillamine remained not associated with survival (HR 0.89, p = 0.54).
+
+- Older age (HR 1.04 per year) and higher serum bilirubin (HR 2.12 per unit of log-bilirubin) remained independently associated with a higher risk of death. Prothrombin time was a new independent risk factor (HR 1.46 per second, p \< 0.001).
+
+- Higher albumin remained associated with a lower risk (HR 0.51 per g/dL, p = 0.009).
+
+- Histologic stage 4 was no longer significant (HR 1.42, p = 0.25), possibly because prothrombin and bilirubin also reflect advanced disease. Stage 3, hepatomegaly and ascites remained non-significant.
+
+- Alkaline phosphatase, platelets, SGOT and serum cholesterol were not associated with survival (HRs close to 1, all p \> 0.2).
+
+### iii. Model comparison
+
+Both models were compared on the same 308 patients (4 missing platelet values).
+
+```{r}
+#  mice version of anova
+D1(fit, fit_main)
+
+# average concordance over the 5 datasets
+mean(sapply(fit_main$analyses, function(m) m$concordance["concordance"]))
+mean(sapply(fit$analyses,      function(m) m$concordance["concordance"]))
+```
+
+**Interpretation:**
+
+The extended model fitted significantly better than the main model (pooled Wald test D1, p = 0.013), and the imputation added very little uncertainty (riv = 0.02). However, discrimination was almost unchanged (mean concordance 0.841 vs 0.836), so the extra variables bring little practical gain.
+
+**Conclusion:** Since there is little gain with the most complex model (extended), the main model is kept as the primary model, the extended model mainly shows that prothrombin time is an additional risk factor.
+
+## d. Do the variables accross the visits influence the HR ?
 
 I then investigated a more complex and realistic model. We have here a longitudinal study, meaning that patients attended one or more visits and have repeated measures of our variables.
+
+TO BE CONTINUED
