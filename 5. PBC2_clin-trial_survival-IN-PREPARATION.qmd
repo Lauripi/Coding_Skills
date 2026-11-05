@@ -1,0 +1,618 @@
+---
+title: "5. PBC2_clin-trial_survival"
+author: "Lauriane Pous"
+format:
+  gfm: default
+  docx: default
+execute:
+  warning: false
+  message: false
+editor: visual
+---
+
+# Project description
+
+This project uses the `pbc2` dataset, which contains longitudinal clinical data from 312 patients with primary biliary cirrhosis (PBC) included in a randomized Phase 3 Mayo Clinic trial. Several measurements were collected repeatedly during follow-up, including serum bilirubin, cholesterol, albumin, alkaline phosphatase, SGOT, platelet count and prothrombin time. The dataset also contains patient characteristics, treatment group and clinical outcomes such as survival status or liver transplantation.
+
+The aim of this project is to evaluate if D-penicil treatment improved the survival of patients compared to controls.
+
+# 1. Data preparation and cleaning
+
+## a. Table loading and formatting
+
+I started with data exploration. This is important to verify how data look like and tries to spot inconsistencies. First I checked the number of rows and columns (1945, 20), column content and data type. Since patients may attend different visits corresponding to a row each, I looked at the number of patients (312) and the number of visits (range: 1-16, median = 5).
+
+Then I looked at the number of duplicates (0), empty rows (0) and NA number (1133).
+
+```{r}
+pacman::p_load(conflicted,tidyverse,wrappedtools, flextable, JMbayes2, dplyr, survival, survminer, broom, corrplot, DescTools)
+conflicts_prefer(survival::coxph, dplyr::filter)
+set_flextable_defaults(
+  font.size = 9,
+  background.color = "white",
+  padding.bottom = 2,
+  padding.top = 2,
+  padding.left = 4,
+  padding.right = 4
+)
+
+data("pbc2")
+
+# quick look on dimension, columns content and data type
+glimpse(pbc2)
+
+# change column name
+pbc2 <- pbc2 |>
+  rename(
+    years_followup = years,
+    time_to_visit = year)
+
+# convert incorrect datatypes 
+pbc2$histologic <- as.factor(pbc2$histologic)
+
+# how many patients
+n_distinct(pbc2$id) 
+
+# range number of rows (visits) per patients
+pbc2 |>
+  count(id) |>
+  summarise(
+    min_rows = min(n),
+    max_rows = max(n),
+    median = median(n)
+    )
+
+# check if duplicates or empty rows and NA number
+sum(duplicated(pbc2))
+sum(apply(pbc2, 1, function(x) all(is.na(x) | x == "")))
+```
+
+## b. Inspect the numerical variables
+
+For numeric variables, I plotted the data from baseline visits to look at distribution. Alkaline, serBilir and serChol have a strong long tail. Mild tail is observed for SGOT and prothrombin,
+
+I also prepared a descriptive statistics table. We can see variables with very different value magnitudes and range widths, based on the minimum and maximum values. Some variables, such as alkaline and serChol, show a particularly wide spread. We also see missing values, especially for serChol, platelets and alkaline.
+
+```{r}
+# Data exploration at baseline
+## plot numeric variables
+num_var <- pbc2 |>
+  select(where(is.numeric), -status2)
+
+num_var |>
+  filter(time_to_visit==0) |>
+  select(-time_to_visit) |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_histogram() +
+  facet_wrap(vars(name), scales = "free") +
+  labs(title = "Distribution of numeric variables at baseline")
+
+## check the numeric value range
+num_var |>
+  filter(time_to_visit==0) |>
+  select(-time_to_visit) |>
+  summarise(
+    across(
+      everything(),
+      list(
+        min = ~ round(min(.x, na.rm = TRUE), 2),
+        max = ~ round(max(.x, na.rm = TRUE), 2),
+        mean = ~ round(mean(.x, na.rm = TRUE), 2),
+        median = ~ round(median(.x, na.rm = TRUE), 2),
+        sd = ~ round(sd(.x, na.rm = TRUE), 2),
+        missing_num = ~ sum(is.na(.x)),
+        missing_pct = ~ round(mean(is.na(.x)) * 100, 1)
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(min|max|mean|median|sd|missing_num|missing_pct)$"
+  ) |>
+  flextable() |>
+  set_caption("Summary of numeric variables - Baseline") |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+
+# Data exploration at all visits
+## plot numeric variables
+
+num_var |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_histogram() +
+  facet_wrap(vars(name), scales = "free")+
+  labs(title = "Distribution of numeric variables - all visits")
+
+## check the numeric value range
+num_var |>
+  summarise(
+    across(
+      everything(),
+      list(
+        min = ~ round(min(.x, na.rm = TRUE), 2),
+        max = ~ round(max(.x, na.rm = TRUE), 2),
+        mean = ~ round(mean(.x, na.rm = TRUE), 2),
+        median = ~ round(median(.x, na.rm = TRUE), 2),
+        sd = ~ round(sd(.x, na.rm = TRUE), 2),
+        missing_num = ~ sum(is.na(.x)),
+        missing_pct = ~ round(mean(is.na(.x)) * 100, 1)
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(min|max|mean|median|sd|missing_num|missing_pct)$"
+  ) |>
+  flextable() |>
+  set_caption("Summary of numeric variables - all visits") |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+```
+
+**Interpretation** :
+
+Plots : for baseline and all visits, data are strongly skewed (long tail) for serBilir, alkaline, serChol. and moderatly skewed for SGOT. I will log-transform them for further analysis.
+
+Tables:
+
+- Baseline : The number of missing values is relatively small at baseline, the number increases at the latest visits:
+
+  - serChol: 28 NA ( 9% of 312 patients), platelets: 4 NA (1%), every other variable is complete
+
+- All visits : increase of the number of NA values at FU visits, which is expected for many reasons like patient condition or non-compliance to protocol. Notably serChol has extremely high increase of Na values
+
+  - serChol: 821 NA (42%), alkaline: 60 (3%), platelets: 73 (4%)
+
+## c. **Investigate why data are missing**
+
+Before deciding how to handle missing values, I first need to investigate the pattern and possible reasons for missingness. I will assess whether missing data are concentrated in a specific treatment arm or at particular visits, whether missingness in one variable tends to occur together with missingness in another variable, and whether missingness is associated with the patient’s clinical status.
+
+```{r}
+# check if cluster of NA by arm
+## plot NA per visit
+pbc2 |>
+  select(drug, serChol, alkaline, platelets) |>
+  pivot_longer(
+    cols = c(serChol, alkaline, platelets),
+    names_to = "Variable",
+    values_to = "Value"
+  ) |>
+  group_by(drug, Variable) |>
+  summarise(
+    missing = mean(is.na(Value)*100),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = drug, y = missing)) +
+  geom_col() +
+  facet_wrap(vars(Variable), scales = "free_y") +
+  labs(
+    title = "Percentage of missing values across visits",
+    x = "Drug",
+    y = "Proportion of missing values (%)"
+  )
+
+# check if cluster of NA by visit 
+## create a new column for visit number
+pbc2_NA <- pbc2 |>
+  arrange(id, time_to_visit) |> 
+  group_by(id) |>
+  mutate(
+    visit_num = row_number()
+  ) |> 
+  ungroup()
+
+## plot NA per visit
+pbc2_NA |>
+  select(visit_num, serChol, alkaline, platelets) |>
+  pivot_longer(
+    cols = c(serChol, alkaline, platelets),
+    names_to = "Variable",
+    values_to = "Value"
+  ) |>
+  group_by(visit_num, Variable) |>
+  summarise(
+    missing = mean(is.na(Value)*100),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = visit_num, y = missing)) +
+  geom_col() +
+  facet_wrap(vars(Variable), scales = "free_y") +
+  labs(
+    title = "Percentage of missing values across visits",
+    x = "Visit number",
+    y = "Proportion of missing values (%)"
+  )
+
+# check if NA related to patient outcome
+pbc2 |>
+  select(status, serChol, alkaline, platelets) |>
+  pivot_longer(
+    cols = c(serChol, alkaline, platelets),
+    names_to = "Variable",
+    values_to = "Value"
+  ) |>
+  group_by(status, Variable) |>
+  summarise(
+    missing = mean(is.na(Value)*100),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = status, y = missing)) +
+  geom_col() +
+  facet_wrap(vars(Variable), scales = "free_y") +
+  labs(
+    title = "Percentage of missing values per patient outcome",
+    x = "Patient outcome",
+    y = "Proportion of missing values (%)"
+  )
+
+pbc2 |>
+  select(histologic, serChol, alkaline, platelets) |>
+  pivot_longer(
+    cols = c(serChol, alkaline, platelets),
+    names_to = "Variable",
+    values_to = "Value"
+  ) |>
+  group_by(histologic, Variable) |>
+  summarise(
+    missing = mean(is.na(Value)*100),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = histologic, y = missing)) +
+  geom_col() +
+  facet_wrap(vars(Variable), scales = "free_y") +
+  labs(
+    title = "Percentage of missing values per disease severity",
+    x = "Histologic stage",
+    y = "Proportion of missing values (%)"
+  )
+```
+
+**Interpretation:**
+
+- data missing per arm : no specific pattern, data missingness not related to treatment
+
+- From data missingness per visit : it looks like platelets and alkaline have same pattern of missingness, with 2 peaks at visits 11 and 13, but stays overall low (max a bit above 12%). For serChol, around 90% of patients miss data at visit 2, missingness stay high at several visits (above 25% at visits 3-8 ), so missingness is not completely random, suggesting a protocol decision (missing by design). Because it depends on an observed variable (the visit), it is consistent with MAR.
+
+- Data missing per patient state : I plotted the percentage of missing data per status and per stage. Higher proportion of missing values for dead patients. It is especially obvious for alkaline and platelets. It is even more obvious with patient disease severity, where we see for alkaline and platelets a strong missingness proportion at stage 4. serChol does not follow that logic.
+
+**Conclusion** : serChol has too many missing data, but the missing data pattern suggests it is MAR. It should be excluded for the longitudinal analyses. Missingness of alkaline and platelets is associated with disease severity (histologic stage 4, death), so it is not MCAR. It is consistent with MAR, but MNAR cannot be excluded.
+
+## d. Inspect the categorical variables
+
+Categorical variables are already classified with levels. Missing values were observed for ascites, hepatomegaly, and spiders.
+
+```{r}
+# Data exploration at baseline
+## plot categorical variables
+pbc2 |>
+  filter(time_to_visit==0) |>
+  select(where(is.factor), -id) |> 
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(vars(name), scales = "free") +
+  labs(title = "Distribution of categorical variables at baseline")
+
+## check the levels and missing values
+pbc2 |>
+  filter(time_to_visit == 0) |>
+  summarise(
+    across(
+      c(where(is.factor), -id),
+      list(
+        levels = ~ {
+          counts <- table(.x)    # number of patients per level
+          paste0(names(counts), " (", counts, ")", collapse = ", ")
+        },
+        missing = ~ sum(is.na(.x))
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(levels|missing)$"
+  ) |>
+  flextable() |>
+  set_caption("Summary of categorical variables at baseline") |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+
+# Data exploration accross all visits
+## plot categorical variables
+pbc2 |>
+  select(where(is.factor), -id) |> 
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(vars(name), scales = "free") +
+  labs(title = "Distribution of categorical variables - all visits")
+
+## check the levels and missing values
+pbc2 |>
+  summarise(
+    across(
+      c(where(is.factor), -id),
+      list(
+        levels = ~ {
+          counts <- table(.x)    # number of patients per level
+          paste0(names(counts), " (", counts, ")", collapse = ", ")
+        },
+        missing = ~ sum(is.na(.x))
+      )
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "(.+)_(levels|missing)$"
+  ) |>
+  flextable() |>
+  set_caption("Summary of categorical variables - all visits") |>
+  autofit() |>
+  set_table_properties(layout = "autofit")
+```
+
+**Interpretation** :
+
+Plots : for baseline and all visits, data are strongly skewed (long tail) for serBilir, alkaline, serChol, and moderatly skewed for SGOT. I log-transformed them for further analysis.
+
+Tables :
+
+- Baseline : no missing data
+
+- All visits : missing data for ascites, hepatomegaly, spiders
+
+# 2. Comparison of survival of patients treated with D-penicil vs placebo
+
+To see if the experimental arm (D-penicil-treated patients) obtained better survival rates than the control arm (placebo patients), I used Kaplan-Meier curve. I started with censoring, meaning deciding what is considered as the end of the trial. In our case alive and trasnplanted were considered as censored, and we counted the number of deaths over the follow up period.
+
+```{r}
+# check how many patients received transplantation per drug group
+pbc2 |>
+  group_by(drug) |>
+  summarise(
+    transplanted = n_distinct(id[status == "transplanted"])
+  )
+
+# create an event new column for km
+pbc2_km <- pbc2 |>
+  filter(time_to_visit==0) |>
+   mutate(
+     event = ifelse(status == "dead", 1, 0)
+  )
+
+# create Kaplan-Meier model
+km_fit <- survfit(
+  Surv(years_followup, event) ~ drug,
+  data = pbc2_km
+)
+
+# check how data look like
+options(width = 200)
+summary(km_fit)
+
+ggsurvplot(
+  km_fit,
+  data = pbc2_km,
+  risk.table = TRUE,
+  pval = TRUE,
+  conf.int = TRUE
+)
+```
+
+**Interpretation** : The survival curves of treated and placebo patients strongly overlap and the log-rank test confirmed no statistically difference between them (p=0,99), indicating that the treatment did not improve the survival of the patients.
+
+# 3. Identification of the risk factors at baseline
+
+For this section, I only look at baseline (i.e. the first visit), ignoring the follow-up visits. To identify which variables are associated with increase of decrease of death risk (hazard ratio), I used Cox regression model and plotted the results.
+
+## a. Variable selection
+
+First step is to decide which variables to include in the cox model. Currently, there are too many variables (15) for 18 coefficients (counts continuous variable as 1, factors as sum of levels -1 ). As a standard, I set a minimum of 10 events per coefficients (simulation studies showed that below this value, the estimates become unreliable (Peduzzi et al., 1995)).
+
+To reduce the number of coefficients, I used several methods :
+
+1.  **Literature research** to identify which variables have already been identified as relevant for PBC prognosis. This exercise is a bit tricky here since results from this clinical trial have been already published years ago. I therefore used references that date before this study (Shapiro et al., 1979, Roll et al., 1983, Christensen et al., 1985).
+
+2.  Look at correlations between variables. If variables are strongly correlated, they don't bring new information
+
+3.  Merge categories with a small patient number, since it is hard to get reliable analysis results on small N.
+
+```{r}
+# count number of events per coefficient
+sum(pbc2_km$event) / 18
+
+# check if there are redundant variables
+## numeric 
+cor_mat <- pbc2_km |>
+  select(albumin, alkaline, platelets, prothrombin, serBilir, SGOT, serChol) |>
+  cor(use = "pairwise.complete.obs", method = "spearman")
+cor_mat
+
+corrplot(
+  cor_mat,
+  method = "color",  
+  type = "upper",   
+  addCoef.col = "black", 
+  tl.col = "black", 
+  number.cex = 0.7  
+)
+
+## categorical 
+cat_vars <- pbc2_km |>
+  select(where(is.factor), -id)
+  
+cv_mat <- PairApply(cat_vars, CramerV, symmetric = TRUE)
+round(cv_mat, 2)
+
+corrplot(
+  cv_mat,
+  method = "color",  
+  type = "upper",
+  is.corr = FALSE, 
+  col.lim = c(0, 1),
+  addCoef.col = "black", 
+  tl.col = "black", 
+  number.cex = 0.7  
+)
+
+# Reduce histologic levels
+pbc2_km <- pbc2_km |>
+  mutate(
+    histologic = fct_collapse(
+      histologic,
+      "1-2" = c("1", "2")
+    )
+  )
+
+## plot the new levels
+pbc2_km |>
+  select(histologic) |> 
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(vars(name), scales = "free") +
+  labs(title = "Distribution of categorical variables at baseline")
+```
+
+**Interpretation:**
+
+Calculation of the max number of variables/coefficients : We have 7.7 events per coefficient (140 deaths divided by 18 coefficients), which is below the threshold of 10. It means I have to reduce variable number. The maximum number of coefficients is 140 / 10 = 14 .
+
+1.  Pre-1989 literature identified bilirubin, age, albumin, histologic stage, hepatomegaly and ascites as prognostic factors (Shapiro 1979; Roll 1983; Christensen 1985). Alkaline phosphatase, platelets, prothrombin time, serum cholesterol and SGOT were not studied there, but were added in the model for biological reasons: cholestasis, portal hypertension, liver function and liver-cell injury.
+
+    - SGOT was moderately correlated with bilirubin (r = 0.59) but kept as a marker of liver-cell injury.
+
+    - Spiders (a non-specific sign) and sex (only 36 men; balanced between arms, V = 0.06) were excluded. Adding them separately to the model did not change the other estimates.
+
+2.  Removal of the redundant variables : for continuous variables, no strong correlation between variables. For categorical variables, ascites and edema are strongly correlated (Cramér’s V = 0.60). Since literature has shown that ascites was a relevant prognostic factor for PBC, I excluded edema.
+
+3.  Merging of levels : For histologic stage, stages 1 and 2 can be grouped together and represent the early stages of the disease.
+
+We have now 7 variables corresponding to 8 coefficients : drug, age, bilirubin, albumin, histologic stage, hepatomegaly, and ascites. We have **140 deaths for 8 coefficients (about 17 per coefficient)**: it's above the minimum of 10, and no patient was dropped (n = 312).
+
+**To be done for a deeper analysis** : run an extended model with more variables to see whether it adds more prognostic information and whether the significant prognostic factors hold even when changing the model.
+
+## b. Evaluation of baseline risk factors
+
+I created a main model, which kept as few variables as possible, and compared it to an extended model.
+
+### i. Evaluation of the main model
+
+```{r}
+# model building
+cox_model <- coxph(
+  Surv(years_followup, event) ~
+    drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites,
+  data = pbc2_km
+)
+summary(cox_model)
+
+ggforest(
+  model = cox_model,
+  data = pbc2_km
+)
+```
+
+**Interpretation** :
+
+**Main model :** The model ranked patients’ risk very well, i.e. good discrimination (Concordance = 0.84).
+
+- D-penicillamine was not associated with survival (HR 0.84, 95% CI 0.59–1.19, p = 0.33).
+
+- Older age (HR 1.04 per year, 95% CI 1.02–1.05), higher serum bilirubin (HR 2.48 per unit of log-bilirubin, 95% CI 2.02–3.05) and histologic stage 4 vs stages 1–2 (HR 1.85, 95% CI 1.07–3.20) were independently associated with a higher risk of death
+
+- Higher albumin was associated with a lower risk (HR 0.52 per g/dL, 95% CI 0.32–0.85).
+
+- Stage 3, hepatomegaly and ascites were not significantly associated with survival, and their wide confidence intervals suggest limited precision.
+
+### ii. Data imputation and evaluation of the extended model
+
+The extended model includes log(alkaline phosphatase), platelets, prothrombin time, log(SGOT) and log(serChol) (13 coefficients). SGOT was moderately correlated with bilirubin (r = 0.59) but kept as a marker of liver-cell injury.
+
+Since serChol had a quite important number of missing values (9%), I chose to use mice package (multivariable imputation by chain equations). Excluding these patients would have reduced the sample and could have biased the results, since missingness may not be completely random. Multiple imputation (mice) fills in the missing values several times, based on the other variables, and combines the results. This keeps all patients and accounts for the uncertainty of the imputed values.
+
+```{r}
+pacman::p_load(mice)
+
+# prepare a new dataset with a new hazard column for the imputation 
+data_imp <- pbc2_km |>
+  drop_na(platelets) |>    # platelets: 4 patients removed
+  select(years_followup, event, drug, age, serBilir, albumin, histologic,
+         hepatomegaly, ascites, alkaline, platelets, prothrombin, SGOT, serChol)
+
+data_imp$hazard <- nelsonaalen(data_imp, years_followup, event)   # calculates for each patient how much risk of death has accumulated up to the end of follow-up
+
+# Missing serChol values imputation
+imp <- mice(data_imp, m = 5, seed = 123)
+
+# extended model on the 5 datasets
+fit <- with(imp, coxph(Surv(years_followup, event) ~ drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites + log(alkaline) + I(platelets/100) + prothrombin + log(SGOT) + log(serChol)))
+
+# main model on the same 5 datasets, for the comparison
+fit_main <- with(imp, coxph(Surv(years_followup, event) ~ drug + age + log(serBilir) + albumin + histologic + hepatomegaly + ascites))
+
+# pooled HRs of the extended model
+pooled <- tidy(pool(fit), conf.int = TRUE) |>
+  mutate(
+    across(c(estimate, conf.low, conf.high), exp),               # coefficients -> HRs
+    p = ifelse(p.value < 0.001, "p < 0.001", paste0("p = ", round(p.value, 3))),
+    row_label = paste0(term, "   HR ", round(estimate, 2),
+                       " (", round(conf.low, 2), "–", round(conf.high, 2), "), ", p)
+  )
+pooled
+
+# forest plot
+ggplot(pooled, aes(x = estimate, y = fct_rev(fct_inorder(row_label)))) +
+  geom_point(shape = 15, size = 2.5) +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high), width = 0.2) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_log10() +
+  labs(
+    title = "Extended model (multiple imputation)",
+    x = "Hazard ratio (95% CI, log scale)",
+    y = NULL
+  )
+```
+
+**Interpretation:**
+
+- D-penicillamine remained not associated with survival (HR 0.89, p = 0.54).
+
+- Older age (HR 1.04 per year) and higher serum bilirubin (HR 2.12 per unit of log-bilirubin) remained independently associated with a higher risk of death. Prothrombin time was a new independent risk factor (HR 1.46 per second, p \< 0.001).
+
+- Higher albumin remained associated with a lower risk (HR 0.51 per g/dL, p = 0.009).
+
+- Histologic stage 4 was no longer significant (HR 1.42, p = 0.25), possibly because prothrombin and bilirubin also reflect advanced disease. Stage 3, hepatomegaly and ascites remained non-significant.
+
+- Alkaline phosphatase, platelets, SGOT and serum cholesterol were not associated with survival (HRs close to 1, all p \> 0.2).
+
+### iii. Model comparison
+
+Both models were compared on the same 308 patients (4 missing platelet values).
+
+```{r}
+#  mice version of anova
+D1(fit, fit_main)
+
+# average concordance over the 5 datasets
+mean(sapply(fit_main$analyses, function(m) m$concordance["concordance"]))
+mean(sapply(fit$analyses,      function(m) m$concordance["concordance"]))
+```
+
+**Interpretation:**
+
+The extended model fitted significantly better than the main model (pooled Wald test D1, p = 0.013), and the imputation added very little uncertainty (riv = 0.02). However, discrimination was almost unchanged (mean concordance 0.841 vs 0.836), so the extra variables bring little practical gain.
+
+**Conclusion:** Since there is little gain with the most complex model (extended), the main model is kept as the primary model, the extended model mainly shows that prothrombin time is an additional risk factor.
+
+## d. Do the variables accross the visits influence the HR ?
+
+I then investigated a more complex and realistic model. We have here a longitudinal study, meaning that patients attended one or more visits and have repeated measures of our variables.
+
+TO BE CONTINUED
